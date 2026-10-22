@@ -109,17 +109,21 @@ export function Play({ view, send, gps, clockOffset, ask }: Props) {
           {clock && <div className="hud-clock num">{clock}</div>}
         </div>
         {!outside && <Timeline config={config} elapsed={elapsed} />}
-        <div className="hud-meta">
-          <span>
-            <Users size={14} /> <span className="num">{alive}</span> en juego
-          </span>
-          {view.nextPingAt && phase === "seeking" && (
+        {outside ? (
+          // While the clock counts down to elimination, the only thing that matters is getting back in.
+          <div className="hud-meta">Vuelve dentro del círculo o quedarás eliminado.</div>
+        ) : (
+          <div className="hud-meta">
             <span>
-              <Radar size={14} /> Radar en <span className="num">{fmt(view.nextPingAt - now)}</span>
+              <Users size={14} /> <span className="num">{alive}</span> en juego
             </span>
-          )}
-          {outside && <span>Vuelve dentro o quedarás eliminado</span>}
-        </div>
+            {view.nextPingAt && phase === "seeking" && (
+              <span>
+                <Radar size={14} /> Radar en <span className="num">{fmt(view.nextPingAt - now)}</span>
+              </span>
+            )}
+          </div>
+        )}
       </header>
 
       <div className="side-fab">
@@ -174,6 +178,23 @@ export function Play({ view, send, gps, clockOffset, ask }: Props) {
             {p.name} necesita ayuda.
           </Notice>
         ))}
+        {me.role === "seeker" &&
+          !ended &&
+          view.players
+            .filter((p) => p.loc && (p.visibleBecause === "outOfZone" || p.visibleBecause === "stale") && !p.sos)
+            .map((p) => (
+              <Notice
+                key={p.id}
+                tone="warn"
+                action={
+                  <button className="notice-action" onClick={() => mapRef.current?.flyTo(p.loc!)}>
+                    Ver
+                  </button>
+                }
+              >
+                {p.visibleBecause === "outOfZone" ? `${p.name} está fuera de la zona.` : `${p.name} ha perdido la señal. Ves su última posición.`}
+              </Notice>
+            ))}
         {gps.error && !SIM_MODE && <Notice tone="warn">{gps.error}</Notice>}
         {fast && !spectating && <Notice tone="warn">Vas a más de 25&nbsp;km/h. En SeekHunt se juega a pie: nada de bici, patinete ni coche.</Notice>}
         {edgeWarning && <Notice tone="warn">{edgeWarning}</Notice>}

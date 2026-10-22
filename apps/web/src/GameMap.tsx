@@ -1,9 +1,9 @@
 import { type Circle, circleRing, type LatLng } from "@seekhunt/shared";
 import type { Feature, FeatureCollection } from "geojson";
 import * as maplibregl from "maplibre-gl";
-import type { GeoJSONSource, MapMouseEvent } from "maplibre-gl";
+import type { GeoJSONSource, MapMouseEvent, StyleSpecification } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
-import { forwardRef, useEffect, useImperativeHandle, useRef } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { initials } from "./ui";
 
 export interface MapPlayer {
@@ -42,6 +42,19 @@ export interface MapHandle {
 
 const DARK = matchMedia("(prefers-color-scheme: dark)").matches;
 const STYLE = `https://tiles.openfreemap.org/styles/${DARK ? "dark" : "positron"}`;
+
+let styleRequest: Promise<StyleSpecification | string> | null = null;
+/**
+ * The style is fetched once and trimmed before MapLibre sees it: highway shields add nothing on foot
+ * and their filters log warnings while the style is parsed. Falls back to the URL if the fetch fails.
+ */
+function loadStyle() {
+  styleRequest ??= fetch(STYLE)
+    .then((r) => (r.ok ? (r.json() as Promise<StyleSpecification>) : Promise.reject(new Error(String(r.status)))))
+    .then((s): StyleSpecification => ({ ...s, layers: s.layers.filter((l) => !l.id.includes("shield")) }))
+    .catch(() => STYLE);
+  return styleRequest;
+}
 const C = DARK
   ? { mask: "#000000", maskOpacity: 0.45, zone: "#ff6a2c", next: "#f1f2f4", label: "#f1f2f4", halo: "#17191c" }
   : { mask: "#121417", maskOpacity: 0.2, zone: "#ff5714", next: "#121417", label: "#121417", halo: "#ffffff" };
@@ -87,6 +100,8 @@ export const GameMap = forwardRef<MapHandle, Props>(function GameMap({ zone, nex
   const mapRef = useRef<maplibregl.Map | null>(null);
   const markers = useRef(new Map<string, { marker: maplibregl.Marker; kind: string }>());
   const ready = useRef(false);
+  // The map is created after the style arrives; markers wait for it.
+  const [mapReady, setMapReady] = useState(false);
   const onTapRef = useRef(onTap);
   onTapRef.current = onTap;
   const data = useRef({ zone, nextZone, pings });
@@ -110,18 +125,39 @@ export const GameMap = forwardRef<MapHandle, Props>(function GameMap({ zone, nex
   };
 
   useEffect(() => {
+    let map: maplibregl.Map | undefined;
+    let cancelled = false;
+    loadStyle().then((style) => {
+      if (cancelled || !el.current) return;
+      map = init(el.current, style);
+    });
+    return () => {
+      cancelled = true;
+      ready.current = false;
+      markers.current.clear();
+      map?.remove();
+      mapRef.current = null;
+    };
+    // The map instance lives for the component's lifetime; data flows in through effects.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function init(container: HTMLElement, style: StyleSpecification | string) {
     const map = new maplibregl.Map({
-      container: el.current!,
-      style: STYLE,
+      container,
+      style,
       center: zone ? [zone.center.lng, zone.center.lat] : [-0.3763, 39.4699],
       zoom: 14,
       attributionControl: false,
       pitchWithRotate: false,
+      // The hosted style is known-good; skipping validation saves work on load.
+      validateStyle: false,
       dragRotate: false,
     });
     map.touchZoomRotate.disableRotation();
     map.addControl(new maplibregl.AttributionControl({ compact: true }), attribution);
     mapRef.current = map;
+    setMapReady(true);
     map.on("click", (e: MapMouseEvent) => onTapRef.current?.({ lat: e.lngLat.lat, lng: e.lngLat.lng }));
     map.on("load", () => {
       for (const id of ["mask", "zone", "next", "pings"]) map.addSource(id, { type: "geojson", data: empty });
@@ -145,14 +181,8 @@ export const GameMap = forwardRef<MapHandle, Props>(function GameMap({ zone, nex
       const f = focus ?? zone;
       if (f) map.fitBounds(boundsOf(f), { padding: pad, duration: 0 });
     });
-    return () => {
-      ready.current = false;
-      markers.current.clear();
-      map.remove();
-    };
-    // The map instance lives for the component's lifetime; data flows in through effects.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    return map;
+  }
 
   useEffect(renderShapes, [zone, nextZone, pings]);
 
@@ -178,7 +208,7 @@ export const GameMap = forwardRef<MapHandle, Props>(function GameMap({ zone, nex
         markers.current.delete(id);
       }
     }
-  }, [players]);
+  }, [players, mapReady]);
 
   const focusKey = refitKey ?? (focus ? `${focus.center.lat},${focus.center.lng},${focus.radius}` : "");
   useEffect(() => {

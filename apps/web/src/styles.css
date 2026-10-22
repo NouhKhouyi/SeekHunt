@@ -263,6 +263,8 @@ input[type="range"] { width: 100%; accent-color: var(--ink); height: 28px; margi
 .play .maplibregl-ctrl-top-right { top: calc(312px + var(--safe-t)); right: calc(var(--gutter-r) - 10px); }
 /* Toasts slide in under the HUD during a game so the clock stays readable. */
 body:has(.play) .toasts { top: calc(140px + var(--safe-t)); }
+/* In the lobby, keep the back button and room code reachable. */
+body:has(.lobby) .toasts { top: calc(66px + var(--safe-t)); }
 .mk {
   width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; font: 700 12px/1 var(--font);
   background: var(--paper); color: var(--ink); border: 2.5px solid var(--ink); box-shadow: 0 2px 6px rgb(0 0 0 / 0.25);
@@ -384,7 +386,7 @@ body:has(.play) .toasts { top: calc(140px + var(--safe-t)); }
 .hud-meta { display: flex; gap: 14px; font-size: 0.8rem; color: var(--ink-3); }
 .hud-meta span { display: inline-flex; align-items: center; gap: 5px; }
 .hud-meta .num { font-weight: 600; color: var(--ink-2); }
-.hud.alert .hud-meta .num { color: #fff; }
+.hud.alert .hud-meta { color: #fff; font-size: 0.88rem; font-weight: 600; }
 
 .side-fab { position: absolute; right: var(--gutter-r); top: calc(150px + var(--safe-t)); display: flex; flex-direction: column; gap: 8px; }
 .sim-chip { position: absolute; left: var(--gutter-l); top: calc(150px + var(--safe-t)); }

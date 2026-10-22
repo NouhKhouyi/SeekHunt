@@ -123,7 +123,10 @@ export function useRoom(code: string, name: string): Connection {
     return () => {
       closed = true;
       clearTimeout(timer);
-      wsRef.current?.close();
+      const ws = wsRef.current;
+      // Closing mid-handshake logs a browser error (React's dev double-mount does this); close once open instead.
+      if (ws?.readyState === WebSocket.CONNECTING) ws.onopen = () => ws.close();
+      else ws?.close();
     };
   }, [code, name]);
 
