@@ -34,7 +34,11 @@ node scripts/smoke.mjs   # partida completa por WebSocket contra el servidor de 
 
 **Probar sin salir de casa:** abre `http://localhost:5173/?sim` en varias pestañas. En modo simulación, tocar el mapa mueve a tu jugador.
 
-**Probar con el móvil en la misma red:** el GPS del navegador exige HTTPS. Usa `npx cloudflared tunnel --url http://localhost:5173` o despliega.
+**Probar con el móvil en la misma red:** los navegadores solo dan acceso al GPS en páginas `https`. Abrir `http://192.168…` no funciona.
+1. Ejecuta `npm run dev:phone`, que sirve la web por HTTPS con un certificado autofirmado.
+2. Abre `https://<ip-de-tu-pc>:5173` en el móvil y acepta el aviso del certificado (en iPhone: *Mostrar detalles → Visitar sitio web*).
+
+También puedes usar `npx cloudflared tunnel --url http://localhost:5173` o desplegar.
 
 ## Despliegue
 

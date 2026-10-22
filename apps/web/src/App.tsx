@@ -1,9 +1,11 @@
-import { useCallback, useEffect, useState } from "react";
-import { Lobby } from "./Lobby";
-import { useMyLocation, useReportLocation, useWakeLock, type MyFix } from "./location";
-import { createRoom, getSavedName, roomExists, saveName, useRoom } from "./net";
-import { Play } from "./Play";
-import { Banner, Toasts } from "./ui";
+import { ArrowRight } from "lucide-react";
+import { lazy, Suspense, useEffect, useState } from "react";
+import { createRoom, getSavedName, roomExists, saveName } from "./net";
+import { CodeInput, Loading, Logo, Notice } from "./ui";
+import { ZoneRings } from "./ZoneRings";
+
+// The map stack (MapLibre) is most of the bundle; Home renders without it.
+const Room = lazy(() => import("./Room"));
 
 const readCode = () => location.hash.replace(/^#/, "").toUpperCase();
 
@@ -22,7 +24,18 @@ export function App() {
     return () => window.removeEventListener("hashchange", onHash);
   }, []);
 
-  if (code && joined && name) return <Room code={code} name={name} />;
+  const leave = () => {
+    history.replaceState(null, "", `${location.pathname}${location.search}`);
+    setCode("");
+    setJoined(false);
+  };
+
+  if (code && joined && name)
+    return (
+      <Suspense fallback={<Loading />}>
+        <Room code={code} name={name} onLeave={leave} />
+      </Suspense>
+    );
   return (
     <Home
       initialCode={code}
@@ -42,96 +55,89 @@ export function App() {
 function Home({ initialCode, name, onEnter }: { initialCode: string; name: string; onEnter: (code: string, name: string) => void }) {
   const [n, setN] = useState(name);
   const [c, setC] = useState(initialCode);
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState<"create" | "join" | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const run = async (fn: () => Promise<void>) => {
-    if (!n.trim()) return setError("Pon tu nombre primero");
-    setBusy(true);
+  const run = async (kind: "create" | "join", fn: () => Promise<void>) => {
+    if (!n.trim()) return setError("Escribe tu nombre para que el resto sepa quién eres.");
+    setBusy(kind);
     setError(null);
     try {
       await fn();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Algo ha fallado");
+      setError(e instanceof Error ? e.message : "No se pudo conectar. Revisa tu conexión.");
     } finally {
-      setBusy(false);
+      setBusy(null);
     }
   };
 
+  const join = () =>
+    run("join", async () => {
+      if (!(await roomExists(c))) throw new Error(`No hay ninguna sala con el código ${c}.`);
+      onEnter(c, n.trim());
+    });
+
   return (
     <main className="home">
-      <img src="/icon.svg" alt="" className="logo" />
-      <h1>SeekHunt</h1>
-      <p className="tagline">Escondite en la calle. La zona se cierra. Solo uno sobrevive.</p>
-      <label className="field">
-        <span>Tu nombre</span>
-        <input value={n} maxLength={20} onChange={(e) => setN(e.target.value)} placeholder="Ej. Nouh" autoComplete="nickname" />
-      </label>
-      <button className="btn btn-primary" disabled={busy} onClick={() => run(async () => onEnter(await createRoom(), n.trim()))}>
-        Crear partida
-      </button>
-      <div className="divider">o únete con un código</div>
-      <div className="row">
-        <input
-          className="code-input"
-          value={c}
-          maxLength={5}
-          onChange={(e) => setC(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ""))}
-          placeholder="ABCDE"
-          autoCapitalize="characters"
-        />
-        <button
-          className="btn"
-          disabled={busy || c.length !== 5}
-          onClick={() =>
-            run(async () => {
-              if (!(await roomExists(c))) throw new Error("No existe ninguna sala con ese código");
-              onEnter(c, n.trim());
-            })
-          }
-        >
-          Unirse
+      <div className="brand">
+        <Logo />
+        SeekHunt
+      </div>
+
+      <ZoneRings />
+
+      <div className="hero-copy">
+        <h1 className="display">
+          Escóndete.
+          <br />
+          <em>La zona</em> se cierra.
+        </h1>
+        <p>Escondite por GPS para jugar con amigos en tu barrio. Un cazador, una zona que encoge cada pocos minutos y un único superviviente.</p>
+      </div>
+
+      <form
+        className="join"
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (c.length === 5) join();
+          else run("create", async () => onEnter(await createRoom(), n.trim()));
+        }}
+      >
+        <label className="field">
+          <span className="label">Tu nombre</span>
+          <input id="name" className="input" value={n} maxLength={20} onChange={(e) => setN(e.target.value)} placeholder="Cómo te verán los demás" autoComplete="nickname" />
+        </label>
+        <button type="button" className="btn btn-block" disabled={!!busy} onClick={() => run("create", async () => onEnter(await createRoom(), n.trim()))}>
+          {busy === "create" ? <span className="spinner" /> : "Crear partida"}
         </button>
-      </div>
-      {error && <Banner tone="danger">{error}</Banner>}
-      <p className="fineprint">Jugad en zonas seguras, sin cruzar carreteras corriendo ni entrar en propiedades privadas.</p>
+        <div className="or">o únete con un código</div>
+        <div className="join-row">
+          <CodeInput length={5} value={c} onChange={setC} label="Código de sala" />
+          <button type="button" className="btn btn-soft" style={{ height: 56 }} disabled={!!busy || c.length !== 5} onClick={join} aria-label="Unirse">
+            {busy === "join" ? <span className="spinner" /> : <ArrowRight size={20} />}
+          </button>
+        </div>
+        {error && <Notice tone="danger">{error}</Notice>}
+      </form>
+
+      <ol className="steps">
+        <li>
+          <span>
+            <b>Marca la zona</b> en el mapa y comparte el código con tu grupo.
+          </span>
+        </li>
+        <li>
+          <span>
+            <b>Escondeos</b> mientras el cazador espera en la salida.
+          </span>
+        </li>
+        <li>
+          <span>
+            <b>Sobrevive</b> a cada cierre. Si sales de la zona, el cazador te ve.
+          </span>
+        </li>
+      </ol>
+      <p className="fineprint">Elegid zonas peatonales. Nada de cruzar carreteras corriendo ni entrar en propiedades privadas.</p>
     </main>
-  );
-}
-
-function Room({ code, name }: { code: string; name: string }) {
-  const conn = useRoom(code, name);
-  const { view, send } = conn;
-  const playing = view?.phase === "hiding" || view?.phase === "seeking";
-  const { fix, error: gpsError, setSimFix } = useMyLocation(true);
-  useWakeLock(playing);
-  const sendFix = useCallback((f: MyFix) => send({ t: "loc", lat: f.lat, lng: f.lng, acc: f.acc }), [send]);
-  useReportLocation(conn.status === "open" ? fix : null, sendFix);
-
-  return (
-    <>
-      <Toasts toasts={conn.toasts} />
-      <div className="status-stack">
-        {conn.status !== "open" && <Banner tone="warn">Reconectando…</Banner>}
-        {gpsError && <Banner tone="danger">{gpsError}</Banner>}
-        {conn.error && (
-          <Banner tone="danger">
-            {conn.error}{" "}
-            <button className="link" onClick={conn.dismissError}>
-              OK
-            </button>
-          </Banner>
-        )}
-      </div>
-      {!view ? (
-        <main className="home">
-          <p>Conectando a la sala {code}…</p>
-        </main>
-      ) : view.phase === "lobby" ? (
-        <Lobby view={view} send={send} fix={fix} />
-      ) : (
-        <Play view={view} send={send} fix={fix} clockOffset={conn.clockOffset} onSimTap={setSimFix} />
-      )}
-    </>
   );
 }

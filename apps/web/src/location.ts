@@ -1,11 +1,21 @@
 import type { LatLng } from "@seekhunt/shared";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 export interface MyFix extends LatLng {
   acc: number;
 }
 
 export const SIM_MODE = new URLSearchParams(location.search).has("sim");
+
+/** Browsers only expose GPS on https:// (or localhost). Opening the dev server by LAN IP silently fails. */
+export const GPS_NEEDS_HTTPS = !window.isSecureContext;
+const HTTPS_MESSAGE = "El GPS solo funciona en páginas https. Abre la app desde su enlace seguro (en desarrollo: npm run dev:phone).";
+
+function describe(e: GeolocationPositionError): string {
+  if (e.code === e.PERMISSION_DENIED) return "Permiso de ubicación denegado. Actívalo en los ajustes del navegador para esta web.";
+  if (e.code === e.TIMEOUT) return "No encontramos señal GPS. Sal a cielo abierto y vuelve a intentarlo.";
+  return "Ubicación no disponible en este momento.";
+}
 
 /**
  * Watches the device position. In ?sim mode the position comes from map taps instead,
@@ -17,22 +27,38 @@ export function useMyLocation(enabled: boolean) {
 
   useEffect(() => {
     if (!enabled || SIM_MODE) return;
-    if (!("geolocation" in navigator)) {
-      setError("Este navegador no tiene GPS");
-      return;
-    }
+    if (GPS_NEEDS_HTTPS) return setError(HTTPS_MESSAGE);
+    if (!("geolocation" in navigator)) return setError("Este navegador no ofrece ubicación.");
     const id = navigator.geolocation.watchPosition(
       (p) => {
         setError(null);
         setFix({ lat: p.coords.latitude, lng: p.coords.longitude, acc: p.coords.accuracy });
       },
-      (e) => setError(e.code === e.PERMISSION_DENIED ? "Necesitamos permiso de ubicación para jugar" : "Buscando señal GPS…"),
+      (e) => setError(describe(e)),
       { enableHighAccuracy: true, maximumAge: 3000, timeout: 20_000 },
     );
     return () => navigator.geolocation.clearWatch(id);
   }, [enabled]);
 
-  return { fix, error, setSimFix: (p: LatLng) => SIM_MODE && setFix({ ...p, acc: 5 }) };
+  /** One-shot request, used by "centre on me" so the tap itself triggers the permission prompt. */
+  const requestFix = useCallback((): Promise<MyFix> => {
+    if (SIM_MODE && fix) return Promise.resolve(fix);
+    if (GPS_NEEDS_HTTPS) return Promise.reject(new Error(HTTPS_MESSAGE));
+    return new Promise((resolve, reject) =>
+      navigator.geolocation.getCurrentPosition(
+        (p) => {
+          const f = { lat: p.coords.latitude, lng: p.coords.longitude, acc: p.coords.accuracy };
+          setFix(f);
+          setError(null);
+          resolve(f);
+        },
+        (e) => reject(new Error(describe(e))),
+        { enableHighAccuracy: true, timeout: 15_000, maximumAge: 10_000 },
+      ),
+    );
+  }, [fix]);
+
+  return { fix, error, requestFix, setSimFix: (p: LatLng) => SIM_MODE && setFix({ ...p, acc: 5 }) };
 }
 
 /** Sends the position to the server at most every `intervalMs`, and immediately on large moves. */

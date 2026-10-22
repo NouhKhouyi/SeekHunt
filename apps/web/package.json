@@ -5,11 +5,14 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host",
+    "dev:phone": "vite --host --mode phone",
     "build": "tsc -p . && vite build",
     "preview": "vite preview"
   },
   "dependencies": {
+    "@fontsource-variable/archivo": "^5.3.0",
     "@seekhunt/shared": "*",
+    "lucide-react": "^1.61.0",
     "maplibre-gl": "^6.15.0",
     "react": "^19.3.1",
     "react-dom": "^19.3.1"
