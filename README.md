@@ -2,6 +2,8 @@
 
 Escondite en la vida real con una zona que se cierra. Una persona busca, el resto se esconde, y la zona se reduce cada X minutos hasta que queda un superviviente.
 
+**En producción:** https://seekhunt.nouhk.workers.dev
+
 Las reglas y mecánicas están en [docs/GAME_DESIGN.md](docs/GAME_DESIGN.md).
 
 ## Stack
@@ -53,13 +55,14 @@ También puedes usar `npx cloudflared tunnel --url http://localhost:5173` o desp
 ## Despliegue
 
 ```bash
-npx wrangler login
-npm run build
-npm run deploy -w @seekhunt/server
+npx wrangler login   # solo la primera vez
+npm run deploy       # compila la web y publica el Worker
 ```
 
-Para servir la web desde el propio Worker, añade a `apps/server/wrangler.jsonc`:
+El Worker sirve la web y además la API (`/api/*`) y los WebSockets (`/ws/*`), así que todo va por un único dominio con HTTPS. Para comprobar producción:
 
-```jsonc
-"assets": { "directory": "../web/dist", "not_found_handling": "single-page-application", "run_worker_first": ["/api/*", "/ws/*"] }
+```bash
+BASE=https://seekhunt.nouhk.workers.dev node scripts/smoke.mjs
 ```
+
+En PowerShell: `$env:BASE="https://seekhunt.nouhk.workers.dev"; node scripts/smoke.mjs`

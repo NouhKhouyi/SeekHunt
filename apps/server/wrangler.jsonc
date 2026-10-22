@@ -3,6 +3,13 @@
   "name": "seekhunt",
   "main": "src/index.ts",
   "compatibility_date": "2026-09-01",
+  // The web build is served by the same Worker: one origin, so /api and /ws need no CORS.
+  "assets": {
+    "directory": "../web/dist",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*", "/ws/*"]
+  },
+  "observability": { "enabled": true },
   "durable_objects": {
     "bindings": [{ "name": "ROOMS", "class_name": "GameRoom" }]
   },

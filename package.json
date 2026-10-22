@@ -10,6 +10,7 @@
     "dev": "concurrently -n server,web -c magenta,cyan \"npm run dev -w @seekhunt/server\" \"npm run dev -w @seekhunt/web\"",
     "dev:phone": "concurrently -n server,web -c magenta,cyan \"npm run dev -w @seekhunt/server\" \"npm run dev:phone -w @seekhunt/web\"",
     "build": "npm run build -w @seekhunt/web",
+    "deploy": "npm run build && npm run deploy -w @seekhunt/server",
     "test": "vitest run",
     "typecheck": "tsc -p packages/shared && tsc -p apps/server && tsc -p apps/web"
   },

@@ -76,7 +76,9 @@ export function Lobby({ view, send, gps, onLeave }: Props) {
     try {
       const fix = await gps.requestFix();
       if (isHost) setConfig({ zone: { center: fix, radius: cfg.zone.radius } });
-      mapRef.current?.flyTo(fix);
+      // The host is placing the zone, so show all of it; everyone else just wants to find themselves.
+      if (isHost) mapRef.current?.fit({ center: fix, radius: cfg.zone.radius });
+      else mapRef.current?.flyTo(fix);
     } catch (e) {
       setLocError(e instanceof Error ? e.message : "No se pudo obtener tu ubicación.");
     } finally {
@@ -278,7 +280,9 @@ export function Lobby({ view, send, gps, onLeave }: Props) {
         {isHost ? (
           <button className="btn" disabled={seekers === 0 || hiders === 0} onClick={() => send({ t: "start" })}>
             <span>{hiders === 0 ? "Falta al menos un escondido" : seekers === 0 ? "Falta un cazador" : "Empezar partida"}</span>
-            <span className="num">{view.players.length} jugadores</span>
+            <span className="num">
+              {view.players.length} {view.players.length === 1 ? "jugador" : "jugadores"}
+            </span>
           </button>
         ) : (
           <div className="waiting">

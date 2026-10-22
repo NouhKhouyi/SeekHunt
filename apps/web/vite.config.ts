@@ -24,7 +24,7 @@ export default defineConfig(({ mode }) => ({
         theme_color: "#121417",
       },
       workbox: {
-        globPatterns: ["**/*.{js,css,html,svg,png,webp,ico,woff2}"],
+        globPatterns: ["**/*.{js,mjs,css,html,svg,png,webp,ico,woff2}"],
         navigateFallbackDenylist: [/^\/api\//, /^\/ws\//],
         maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
         runtimeCaching: [

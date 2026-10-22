@@ -3,6 +3,7 @@ import type { Feature, FeatureCollection } from "geojson";
 import * as maplibregl from "maplibre-gl";
 import type { GeoJSONSource, MapMouseEvent, StyleSpecification } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
+import workerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?url";
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { initials } from "./ui";
 
@@ -42,6 +43,10 @@ export interface MapHandle {
 
 const DARK = matchMedia("(prefers-color-scheme: dark)").matches;
 const STYLE = `https://tiles.openfreemap.org/styles/${DARK ? "dark" : "positron"}`;
+
+// MapLibre v6 looks for its worker next to its own module; once bundled that file isn't there,
+// so ship it as an asset and point MapLibre at it.
+maplibregl.setWorkerUrl(workerUrl);
 
 let styleRequest: Promise<StyleSpecification | string> | null = null;
 /**
