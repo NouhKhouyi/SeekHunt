@@ -1,6 +1,6 @@
-import type { ClientMsg, GameConfig, GameView, Role } from "@seekhunt/shared";
+import { type ClientMsg, DEFAULT_CONFIG, distance, type GameConfig, type GameView, type Role } from "@seekhunt/shared";
 import { Check, ChevronDown, ChevronLeft, LocateFixed, Share2, X } from "lucide-react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { GameMap, type MapHandle, type MapPlayer } from "./GameMap";
 import { SIM_MODE } from "./location";
 import type { Gps } from "./Room";
@@ -86,6 +86,21 @@ export function Lobby({ view, send, gps, onLeave }: Props) {
     }
   };
 
+  // A new room starts with the zone at a placeholder spot. As soon as the host's GPS answers, put the
+  // zone where they actually are, unless they have already placed it themselves.
+  const autoCentered = useRef(false);
+  const fix = gps.fix;
+  const zoneUntouched = cfg.zone.center.lat === DEFAULT_CONFIG.zone.center.lat && cfg.zone.center.lng === DEFAULT_CONFIG.zone.center.lng;
+  useEffect(() => {
+    if (!isHost || !fix || !zoneUntouched || autoCentered.current || SIM_MODE) return;
+    autoCentered.current = true;
+    send({ t: "config", config: { zone: { center: { lat: fix.lat, lng: fix.lng }, radius: cfg.zone.radius } } });
+    mapRef.current?.fit({ center: fix, radius: cfg.zone.radius });
+  }, [isHost, fix, zoneUntouched, cfg.zone.radius, send]);
+
+  // Far from the play area: say so, instead of leaving the player looking at an empty map.
+  const kmAway = fix ? (distance(fix, cfg.zone.center) - cfg.zone.radius) / 1000 : 0;
+
   const mapPlayers: MapPlayer[] = view.players
     .filter((p) => p.loc && p.id !== view.me.id)
     .map((p) => ({ id: p.id, name: p.name, pos: p.loc!, kind: p.role }));
@@ -134,6 +149,26 @@ export function Lobby({ view, send, gps, onLeave }: Props) {
         {(locError || gps.error) && (
           <div style={{ paddingBottom: 16 }}>
             <Notice tone="warn">{locError ?? gps.error}</Notice>
+          </div>
+        )}
+        {!locError && !gps.error && kmAway > 1 && !(isHost && zoneUntouched) && (
+          <div style={{ paddingBottom: 16 }}>
+            <Notice
+              tone="warn"
+              action={
+                isHost ? (
+                  <button className="notice-action" onClick={locate}>
+                    Mover aquí
+                  </button>
+                ) : (
+                  <button className="notice-action" onClick={() => fix && mapRef.current?.flyTo(fix)}>
+                    Ver
+                  </button>
+                )
+              }
+            >
+              Estás a {NUM0.format(kmAway)}&nbsp;km de la zona de juego.
+            </Notice>
           </div>
         )}
 

@@ -113,9 +113,16 @@ export const GameMap = forwardRef<MapHandle, Props>(function GameMap({ zone, nex
   data.current = { zone, nextZone, pings };
   const pad = padding ?? { top: 40, bottom: 40, left: 40, right: 40 };
 
+  // Camera requests that arrive before the map has loaded (e.g. the first GPS fix) are kept and run on load.
+  const pendingCamera = useRef<((map: maplibregl.Map) => void) | null>(null);
+  const camera = (move: (map: maplibregl.Map) => void) => {
+    if (mapRef.current && ready.current) move(mapRef.current);
+    else pendingCamera.current = move;
+  };
+
   useImperativeHandle(ref, () => ({
-    flyTo: (p) => mapRef.current?.flyTo({ center: [p.lng, p.lat], zoom: Math.max(mapRef.current.getZoom(), 16), duration: 700 }),
-    fit: (c) => mapRef.current?.fitBounds(boundsOf(c), { padding: pad, duration: 700 }),
+    flyTo: (p) => camera((map) => map.flyTo({ center: [p.lng, p.lat], zoom: Math.max(map.getZoom(), 16), duration: 700 })),
+    fit: (c) => camera((map) => map.fitBounds(boundsOf(c), { padding: pad, duration: 700 })),
   }));
 
   const renderShapes = () => {
@@ -185,6 +192,8 @@ export const GameMap = forwardRef<MapHandle, Props>(function GameMap({ zone, nex
       renderShapes();
       const f = focus ?? zone;
       if (f) map.fitBounds(boundsOf(f), { padding: pad, duration: 0 });
+      pendingCamera.current?.(map);
+      pendingCamera.current = null;
     });
     return map;
   }
