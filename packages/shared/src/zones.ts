@@ -1,4 +1,4 @@
-import type { GameConfig } from "./config";
+import { effectiveFinalRadius, type GameConfig } from "./config";
 import { type Circle, randomPointInCircle } from "./geo";
 import { mulberry32 } from "./rng";
 
@@ -17,7 +17,7 @@ export function buildSchedule(config: GameConfig, seed: number, seekStart: numbe
   const rand = mulberry32(seed);
   const n = config.shrinkCount;
   const r0 = config.zone.radius;
-  const rf = Math.min(config.finalRadius, r0);
+  const rf = effectiveFinalRadius(config);
   const steps: ZoneStep[] = [{ circle: config.zone, shrinkStart: seekStart, shrinkEnd: seekStart }];
   for (let k = 1; k <= n; k++) {
     const prev = steps[k - 1]!.circle;

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_CONFIG, sanitizeConfig } from "./config";
+import { DEFAULT_CONFIG, effectiveFinalRadius, sanitizeConfig } from "./config";
 import { distance, offset } from "./geo";
 import { createGame, handle, hello, tick, viewFor } from "./engine";
 import { mulberry32 } from "./rng";
@@ -18,6 +18,24 @@ function startedGame(players = ["seek", "ana", "bea"], overrides = {}) {
   for (const p of players) handle(s, id(p), { t: "loc", ...center, acc: 5 }, 0);
   return s;
 }
+
+describe("config", () => {
+  it("accepts exact radii down to 25 m and keeps the chosen final radius", () => {
+    const small = sanitizeConfig({ zone: { center, radius: 30.4 } }, DEFAULT_CONFIG);
+    expect(small.zone.radius).toBe(30);
+    expect(sanitizeConfig({ zone: { center, radius: 3 } }, DEFAULT_CONFIG).zone.radius).toBe(25);
+    // Growing the zone back restores the original final radius.
+    expect(sanitizeConfig({ zone: { center, radius: 900 } }, small).finalRadius).toBe(DEFAULT_CONFIG.finalRadius);
+  });
+
+  it("a tiny zone still shrinks: the final circle is at most half the first", () => {
+    const cfg = sanitizeConfig({ zone: { center, radius: 30 }, finalRadius: 60 }, DEFAULT_CONFIG);
+    expect(effectiveFinalRadius(cfg)).toBe(15);
+    const steps = buildSchedule(cfg, 3, 0);
+    expect(steps.at(-1)!.circle.radius).toBeCloseTo(15, 5);
+    for (let k = 1; k < steps.length; k++) expect(steps[k]!.circle.radius).toBeLessThan(steps[k - 1]!.circle.radius);
+  });
+});
 
 describe("zones", () => {
   it("each circle is contained in the previous one and radii shrink to finalRadius", () => {

@@ -48,6 +48,14 @@ export const DEFAULT_CONFIG: GameConfig = {
 const clamp = (v: unknown, min: number, max: number, fallback: number) =>
   typeof v === "number" && Number.isFinite(v) ? Math.min(max, Math.max(min, v)) : fallback;
 
+export const MIN_ZONE_RADIUS = 25;
+export const MAX_ZONE_RADIUS = 20_000;
+
+/** The last zone is never more than half the first one, so even a tiny play area still closes in. */
+export function effectiveFinalRadius(config: GameConfig): number {
+  return Math.max(5, Math.min(config.finalRadius, config.zone.radius / 2));
+}
+
 /** Merges an untrusted partial config onto `base`, clamping every value to a sane range. */
 export function sanitizeConfig(input: Partial<GameConfig> | undefined, base: GameConfig): GameConfig {
   const i = input ?? {};
@@ -59,7 +67,7 @@ export function sanitizeConfig(input: Partial<GameConfig> | undefined, base: Gam
             lat: clamp(zoneIn.center.lat, -85, 85, base.zone.center.lat),
             lng: clamp(zoneIn.center.lng, -180, 180, base.zone.center.lng),
           },
-          radius: clamp(zoneIn.radius, 50, 20_000, base.zone.radius),
+          radius: Math.round(clamp(zoneIn.radius, MIN_ZONE_RADIUS, MAX_ZONE_RADIUS, base.zone.radius)),
         }
       : base.zone;
   const shrinkIntervalSeconds = clamp(i.shrinkIntervalSeconds, 30, 3600, base.shrinkIntervalSeconds);
@@ -69,7 +77,9 @@ export function sanitizeConfig(input: Partial<GameConfig> | undefined, base: Gam
     shrinkCount: Math.round(clamp(i.shrinkCount, 0, 20, base.shrinkCount)),
     shrinkIntervalSeconds,
     shrinkDurationSeconds: clamp(i.shrinkDurationSeconds, 0, shrinkIntervalSeconds, base.shrinkDurationSeconds),
-    finalRadius: clamp(i.finalRadius, 10, zone.radius, Math.min(base.finalRadius, zone.radius)),
+    // Kept as chosen; effectiveFinalRadius() fits it to the zone at play time, so shrinking the zone
+    // and growing it back doesn't lose the setting.
+    finalRadius: clamp(i.finalRadius, 5, MAX_ZONE_RADIUS, base.finalRadius),
     finalHoldSeconds: clamp(i.finalHoldSeconds, 0, 3600, base.finalHoldSeconds),
     outOfZoneGraceSeconds: clamp(i.outOfZoneGraceSeconds, 0, 600, base.outOfZoneGraceSeconds),
     pingIntervalSeconds: clamp(i.pingIntervalSeconds, 0, 3600, base.pingIntervalSeconds),

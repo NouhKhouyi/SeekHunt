@@ -5,7 +5,7 @@ import { CatchQr, QrFullscreen, Scanner } from "./Catch";
 import { GameMap, type MapHandle, type MapPing, type MapPlayer } from "./GameMap";
 import { SIM_MODE, WALKING_LIMIT } from "./location";
 import type { Gps } from "./Room";
-import { type ConfirmRequest, fmt, initials, Notice, Timeline, useNow } from "./ui";
+import { type ConfirmRequest, fmt, GameProgress, initials, Notice, useNow } from "./ui";
 
 interface Props {
   view: GameView;
@@ -108,7 +108,7 @@ export function Play({ view, send, gps, clockOffset, ask }: Props) {
           </div>
           {clock && <div className="hud-clock num">{clock}</div>}
         </div>
-        {!outside && <Timeline config={config} elapsed={elapsed} />}
+        {!outside && <GameProgress config={config} elapsed={elapsed} />}
         {outside ? (
           // While the clock counts down to elimination, the only thing that matters is getting back in.
           <div className="hud-meta">Vuelve dentro del círculo o quedarás eliminado.</div>

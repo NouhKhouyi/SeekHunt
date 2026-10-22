@@ -320,13 +320,48 @@ body:has(.lobby) .toasts { top: calc(66px + var(--safe-t)); }
 .dot-online { width: 7px; height: 7px; border-radius: 50%; background: #1fb85a; display: inline-block; margin-right: 6px; vertical-align: 1px; }
 .players li.offline .dot-online { background: var(--ink-3); }
 
-.timeline { display: flex; gap: 3px; height: 10px; }
-.timeline i { display: block; height: 100%; border-radius: 3px; background: var(--fill); position: relative; overflow: hidden; }
-.timeline i.hide { background: repeating-linear-gradient(-45deg, var(--line) 0 3px, var(--fill) 3px 6px); }
-.timeline i.shrink { background: color-mix(in srgb, var(--blaze) calc(var(--k) * 100%), var(--fill)); }
-.timeline i.hold { background: var(--ink); }
-.timeline i .done { position: absolute; inset: 0 auto 0 0; background: var(--ink); opacity: 0.85; }
-.timeline-legend { display: flex; justify-content: space-between; font-size: 0.78rem; color: var(--ink-3); gap: 8px; }
+/* Radius: the big number is itself the input. */
+.radius-input { display: flex; align-items: baseline; gap: 4px; cursor: text; align-self: flex-start; }
+.radius-input input {
+  font: inherit; color: var(--ink); background: none; border: 0; padding: 0 0 2px; margin: 0; outline: none; min-width: 2ch;
+  border-bottom: 2px dashed var(--line); transition: border-color 0.15s;
+}
+.radius-input input:hover { border-bottom-color: var(--ink-3); }
+.radius-input input:focus { border-bottom: 2px solid var(--ink); }
+.chips { display: flex; gap: 6px; }
+.chips .chip { flex: 1; min-width: 0; padding: 0 6px; }
+.chip {
+  height: 40px; padding: 0 14px; border-radius: 999px; border: 1.5px solid var(--line); background: none; cursor: pointer;
+  font-size: 0.85rem; font-weight: 600; color: var(--ink-2); font-variant-numeric: tabular-nums;
+}
+.chip[aria-pressed="true"] { background: var(--ink); border-color: var(--ink); color: var(--paper); }
+@media (hover: hover) { .chip:hover:not([aria-pressed="true"]) { border-color: var(--ink-3); color: var(--ink); } }
+
+/* Pace: one circle per zone on a time line, each sized by its real radius. */
+.sched { display: flex; flex-direction: column; gap: 6px; }
+.sched-plot, .sched-ticks { position: relative; margin: 0 14px; }
+.sched-plot { height: 34px; }
+.sched-line { position: absolute; top: 50%; height: 2px; transform: translateY(-50%); background: var(--line); }
+.sched-line.hide { background: repeating-linear-gradient(90deg, var(--ink-3) 0 3px, transparent 3px 7px); opacity: 0.6; }
+.sched-plot i {
+  position: absolute; top: 50%; transform: translate(-50%, -50%); border-radius: 50%;
+  border: 2px solid var(--ink); background: var(--paper); box-sizing: border-box;
+}
+.sched-plot i.last { background: var(--blaze); border-color: var(--blaze); }
+.sched-end { position: absolute; top: 50%; width: 2px; height: 12px; border-radius: 1px; background: var(--ink-3); transform: translate(-50%, -50%); }
+.sched-ticks { height: 16px; font-size: 0.75rem; color: var(--ink-3); }
+.sched-ticks span { position: absolute; transform: translateX(-50%); white-space: nowrap; }
+.sched-legend { display: flex; justify-content: space-between; gap: 12px; font-size: 0.82rem; color: var(--ink-2); padding-top: 4px; }
+.sched-legend .num { color: var(--ink); }
+
+/* In-game progress: thin track, a dot per shrink. */
+.progress { position: relative; height: 4px; border-radius: 4px; background: var(--fill); margin: 3px 4px; }
+.progress-fill { position: absolute; inset: 0 auto 0 0; border-radius: 4px; background: var(--ink); transition: width 0.5s linear; }
+.progress i {
+  position: absolute; top: 50%; width: 9px; height: 9px; border-radius: 50%; transform: translate(-50%, -50%);
+  background: var(--paper); border: 2px solid var(--blaze); box-sizing: border-box;
+}
+.progress i.passed { background: var(--ink); border-color: var(--paper); }
 
 .disclosure { border: 0; background: none; padding: 0; display: flex; justify-content: space-between; align-items: center; width: 100%; cursor: pointer; font-weight: 700; font-size: 1.02rem; }
 .disclosure svg { transition: transform 0.2s; color: var(--ink-3); }

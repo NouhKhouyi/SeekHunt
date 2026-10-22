@@ -1,4 +1,5 @@
 import { AlertTriangle, Bell, CircleDot, Crosshair, Flag, LifeBuoy, Radar, UserPlus } from "lucide-react";
+import { effectiveFinalRadius, type GameConfig } from "@seekhunt/shared";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import type { Toast } from "./net";
 
@@ -157,26 +158,68 @@ export function Loading() {
   );
 }
 
-/** Whole game at a glance: head start, each shrink (darker as the zone tightens), final hold. */
-export function Timeline({ config, elapsed }: { config: { hideSeconds: number; shrinkCount: number; shrinkIntervalSeconds: number; finalHoldSeconds: number }; elapsed?: number }) {
-  const segs: { kind: "hide" | "shrink" | "hold"; s: number; k?: number }[] = [
-    { kind: "hide" as const, s: config.hideSeconds },
-    ...Array.from({ length: config.shrinkCount }, (_, i) => ({ kind: "shrink" as const, s: config.shrinkIntervalSeconds, k: 0.25 + (0.75 * (i + 1)) / config.shrinkCount })),
-    { kind: "hold" as const, s: config.finalHoldSeconds },
-  ].filter((x) => x.s > 0);
-  let acc = 0;
+/** When each zone starts (seconds from the game start), its radius, and when the game ends. */
+export function gamePlan(config: GameConfig) {
+  const r0 = config.zone.radius;
+  const rf = effectiveFinalRadius(config);
+  const n = config.shrinkCount;
+  const zones = Array.from({ length: n + 1 }, (_, k) => ({
+    at: config.hideSeconds + k * config.shrinkIntervalSeconds,
+    radius: n === 0 ? r0 : r0 * Math.pow(rf / r0, k / n),
+  }));
+  const end = config.hideSeconds + n * config.shrinkIntervalSeconds + (n > 0 ? config.shrinkDurationSeconds : 0) + config.finalHoldSeconds;
+  return { zones, end: Math.max(end, 1) };
+}
+
+const minutes = (s: number) => `${Math.round(s / 60)}′`;
+const meters = (m: number) => `${m >= 1000 ? (m / 1000).toLocaleString("es-ES", { maximumFractionDigits: 1 }) + " km" : Math.round(m) + " m"}`;
+
+/**
+ * The pace of a game drawn as what actually happens: a line through time with one circle per zone,
+ * each sized by its real radius and marked with the minute it begins.
+ */
+export function ZoneSchedule({ config }: { config: GameConfig }) {
+  const { zones, end } = gamePlan(config);
+  const r0 = config.zone.radius;
+  const x = (t: number) => `${(t / end) * 100}%`;
+  // Minute labels only where there is room for them; the first and last are always shown.
+  const roomy = zones.length < 2 || config.shrinkIntervalSeconds / end > 0.085;
   return (
-    <div className="timeline" aria-hidden>
-      {segs.map((seg, i) => {
-        const start = acc;
-        acc += seg.s;
-        const done = elapsed === undefined ? 0 : Math.min(1, Math.max(0, (elapsed - start) / seg.s));
-        return (
-          <i key={i} className={seg.kind} style={{ flex: seg.s, ["--k" as string]: seg.k }}>
-            {done > 0 && <span className="done" style={{ width: `${done * 100}%` }} />}
-          </i>
-        );
-      })}
+    <div className="sched" role="img" aria-label={`Escondite de ${minutes(config.hideSeconds)}, ${config.shrinkCount} cierres cada ${minutes(config.shrinkIntervalSeconds)}, de ${meters(r0)} a ${meters(zones.at(-1)!.radius)}`}>
+      <div className="sched-plot">
+        <span className="sched-line hide" style={{ left: 0, width: x(config.hideSeconds) }} />
+        <span className="sched-line" style={{ left: x(config.hideSeconds), right: 0 }} />
+        {zones.map((z, i) => {
+          const d = 7 + 21 * Math.sqrt(z.radius / r0);
+          return <i key={i} className={i === zones.length - 1 ? "last" : undefined} style={{ left: x(z.at), width: d, height: d }} />;
+        })}
+        <b className="sched-end" style={{ left: "100%" }} />
+      </div>
+      <div className="sched-ticks num">
+        {config.hideSeconds > 0 && <span style={{ left: 0 }}>0′</span>}
+        {zones.map((z, i) => (roomy || i === 0 || i === zones.length - 1 ? <span key={i} style={{ left: x(z.at) }}>{minutes(z.at)}</span> : null))}
+        <span style={{ left: "100%" }}>{minutes(end)}</span>
+      </div>
+      <div className="sched-legend">
+        <span>{config.hideSeconds > 0 ? `${minutes(config.hideSeconds)} para esconderse` : "Sin tiempo para esconderse"}</span>
+        <span className="num">
+          {meters(r0)} → {meters(zones.at(-1)!.radius)}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+/** In-game: a thin progress track with a dot per shrink; passed dots fill in. */
+export function GameProgress({ config, elapsed }: { config: GameConfig; elapsed: number }) {
+  const { zones, end } = gamePlan(config);
+  const pct = (t: number) => `${Math.min(100, Math.max(0, (t / end) * 100))}%`;
+  return (
+    <div className="progress" aria-hidden>
+      <span className="progress-fill" style={{ width: pct(elapsed) }} />
+      {zones.slice(1).map((z, i) => (
+        <i key={i} className={elapsed >= z.at ? "passed" : undefined} style={{ left: pct(z.at) }} />
+      ))}
     </div>
   );
 }

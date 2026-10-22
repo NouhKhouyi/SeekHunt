@@ -1,10 +1,10 @@
-import { type ClientMsg, DEFAULT_CONFIG, distance, type GameConfig, type GameView, type Role } from "@seekhunt/shared";
+import { type ClientMsg, DEFAULT_CONFIG, distance, effectiveFinalRadius, type GameConfig, type GameView, MAX_ZONE_RADIUS, MIN_ZONE_RADIUS, type Role } from "@seekhunt/shared";
 import { Check, ChevronDown, ChevronLeft, LocateFixed, Share2, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { GameMap, type MapHandle, type MapPlayer } from "./GameMap";
 import { SIM_MODE } from "./location";
 import type { Gps } from "./Room";
-import { initials, Notice, Segmented, Switch, Timeline } from "./ui";
+import { gamePlan, initials, Notice, Segmented, Switch, ZoneSchedule } from "./ui";
 
 interface Props {
   view: GameView;
@@ -27,17 +27,80 @@ const ADVANCED: { key: NumKey; label: string; hint?: string; values: [number, st
   { key: "shrinkCount", label: "Número de cierres", values: [[3, "3"], [4, "4"], [5, "5"], [6, "6"], [8, "8"]] },
   { key: "shrinkIntervalSeconds", label: "Tiempo entre cierres", values: [[2 * MIN, "2 min"], [3 * MIN, "3 min"], [5 * MIN, "5 min"], [8 * MIN, "8 min"], [10 * MIN, "10 min"]] },
   { key: "shrinkDurationSeconds", label: "Duración de cada cierre", values: [[0, "Instantáneo"], [30, "30 s"], [MIN, "1 min"], [2 * MIN, "2 min"]] },
-  { key: "finalRadius", label: "Radio de la zona final", values: [[30, "30 m"], [40, "40 m"], [60, "60 m"], [100, "100 m"], [200, "200 m"]] },
+  { key: "finalRadius", label: "Radio de la zona final", values: [[10, "10 m"], [20, "20 m"], [30, "30 m"], [40, "40 m"], [60, "60 m"], [100, "100 m"], [200, "200 m"]] },
   { key: "finalHoldSeconds", label: "Tiempo en la zona final", values: [[0, "Ninguno"], [3 * MIN, "3 min"], [5 * MIN, "5 min"], [10 * MIN, "10 min"]] },
   { key: "outOfZoneGraceSeconds", label: "Margen fuera de la zona", hint: "Después, eliminado", values: [[15, "15 s"], [30, "30 s"], [45, "45 s"], [90, "90 s"]] },
   { key: "pingIntervalSeconds", label: "Radar", hint: "Revela posiciones aproximadas", values: [[0, "Desactivado"], [2 * MIN, "Cada 2 min"], [3 * MIN, "Cada 3 min"], [5 * MIN, "Cada 5 min"]] },
   { key: "pingFuzzMeters", label: "Precisión del radar", values: [[30, "± 30 m"], [80, "± 80 m"], [150, "± 150 m"], [300, "± 300 m"]] },
 ];
 
-const totalMinutes = (c: GameConfig) => Math.round((c.hideSeconds + c.shrinkCount * c.shrinkIntervalSeconds + c.shrinkDurationSeconds + c.finalHoldSeconds) / 60);
 const fmtKm2 = (r: number) => (Math.PI * r * r) / 1e6;
 const NUM0 = new Intl.NumberFormat("es-ES", { maximumFractionDigits: 0 });
+const NUM1 = new Intl.NumberFormat("es-ES", { maximumFractionDigits: 1 });
 const NUM2 = new Intl.NumberFormat("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+/** m² for a courtyard, hectares for a park, km² for a neighbourhood. */
+const fmtArea = (km2: number) =>
+  km2 < 0.01 ? `${NUM0.format(km2 * 1e6)} m²` : km2 < 1 ? `${NUM1.format(km2 * 100)} ha` : `${NUM2.format(km2)} km²`;
+
+// The slider is logarithmic: a step near 30 m matters as much as one near 3 km.
+const SLIDER_MAX = 5000;
+const toSlider = (r: number) => (1000 * Math.log(Math.min(SLIDER_MAX, Math.max(MIN_ZONE_RADIUS, r)) / MIN_ZONE_RADIUS)) / Math.log(SLIDER_MAX / MIN_ZONE_RADIUS);
+const fromSlider = (s: number) => {
+  const r = MIN_ZONE_RADIUS * Math.pow(SLIDER_MAX / MIN_ZONE_RADIUS, s / 1000);
+  const step = r < 100 ? 5 : r < 1000 ? 10 : 50;
+  return Math.round(r / step) * step;
+};
+const QUICK_RADII = [50, 100, 250, 500, 1000];
+
+/** Exact metres, a quick pick, or the slider: all three edit the same radius. */
+function RadiusControl({ value, onPreview, onCommit }: { value: number; onPreview: (r: number) => void; onCommit: (r: number) => void }) {
+  const [text, setText] = useState<string | null>(null);
+  const shown = text ?? String(Math.round(value));
+  const commitText = () => {
+    if (text === null) return;
+    const r = Math.round(Number(text.replace(",", ".")));
+    setText(null);
+    if (Number.isFinite(r) && r > 0) onCommit(Math.min(MAX_ZONE_RADIUS, Math.max(MIN_ZONE_RADIUS, r)));
+  };
+  return (
+    <>
+      <label className="big-value num radius-input">
+        <input
+          id="radius-exact"
+          inputMode="numeric"
+          aria-label="Radio de la zona en metros"
+          value={shown}
+          style={{ width: `${Math.max(2, shown.length) + 0.3}ch` }}
+          onChange={(e) => setText(e.target.value.replace(/[^\d]/g, "").slice(0, 5))}
+          onFocus={(e) => e.target.select()}
+          onBlur={commitText}
+          onKeyDown={(e) => e.key === "Enter" && (e.currentTarget as HTMLInputElement).blur()}
+        />
+        <small>m de radio</small>
+      </label>
+      <div className="chips" role="group" aria-label="Radios habituales">
+        {QUICK_RADII.map((r) => (
+          <button key={r} type="button" className="chip" aria-pressed={Math.round(value) === r} onClick={() => onCommit(r)}>
+            {r >= 1000 ? `${r / 1000} km` : `${r} m`}
+          </button>
+        ))}
+      </div>
+      <input
+        id="radius"
+        type="range"
+        aria-label="Radio de la zona"
+        aria-valuetext={`${Math.round(value)} metros`}
+        min={0}
+        max={1000}
+        step={1}
+        value={toSlider(value)}
+        onChange={(e) => onPreview(fromSlider(Number(e.target.value)))}
+        onPointerUp={(e) => onCommit(fromSlider(Number((e.target as HTMLInputElement).value)))}
+        onKeyUp={(e) => onCommit(fromSlider(Number((e.target as HTMLInputElement).value)))}
+      />
+    </>
+  );
+}
 
 export function Lobby({ view, send, gps, onLeave }: Props) {
   const isHost = view.me.id === view.hostId;
@@ -175,27 +238,15 @@ export function Lobby({ view, send, gps, onLeave }: Props) {
         <div className="block">
           <div className="block-head">
             <h2>Zona de juego</h2>
-            <span className="faint small num">{area < 1 ? `${NUM0.format(area * 100)} ha` : `${NUM2.format(area)} km²`}</span>
+            <span className="faint small num">{fmtArea(area)}</span>
           </div>
-          <div className="row spread">
+          {isHost ? (
+            <RadiusControl value={shownRadius} onPreview={setRadius} onCommit={(r) => (setRadius(null), setConfig({ zone: { center: cfg.zone.center, radius: r } }))} />
+          ) : (
             <div className="big-value num">
               {Math.round(shownRadius)}
               <small>m de radio</small>
             </div>
-          </div>
-          {isHost && (
-            <input
-              id="radius"
-              type="range"
-              aria-label="Radio inicial"
-              min={100}
-              max={3000}
-              step={50}
-              value={shownRadius}
-              onChange={(e) => setRadius(Number(e.target.value))}
-              onPointerUp={() => radius !== null && (setConfig({ zone: { center: cfg.zone.center, radius } }), setRadius(null))}
-              onKeyUp={() => radius !== null && (setConfig({ zone: { center: cfg.zone.center, radius } }), setRadius(null))}
-            />
           )}
         </div>
 
@@ -249,7 +300,7 @@ export function Lobby({ view, send, gps, onLeave }: Props) {
         <div className="block">
           <div className="block-head">
             <h2>Ritmo</h2>
-            <span className="faint small num">≈ {totalMinutes(cfg)} min</span>
+            <span className="faint small num">{Math.round(gamePlan(cfg).end / 60)}&nbsp;min</span>
           </div>
           {isHost && (
             <Segmented
@@ -259,14 +310,7 @@ export function Lobby({ view, send, gps, onLeave }: Props) {
               options={PRESETS.map((p) => ({ value: p.id, label: p.label }))}
             />
           )}
-          <Timeline config={cfg} />
-          <div className="timeline-legend num">
-            <span>{Math.round(cfg.hideSeconds / 60)}′ escondite</span>
-            <span>
-              {cfg.shrinkCount} cierres × {Math.round(cfg.shrinkIntervalSeconds / 60)}′
-            </span>
-            <span>{Math.round(cfg.zone.radius)} → {Math.round(cfg.finalRadius)}&nbsp;m</span>
-          </div>
+          <ZoneSchedule config={{ ...cfg, zone: { ...cfg.zone, radius: shownRadius } }} />
         </div>
 
         <div className="block">
@@ -294,7 +338,11 @@ export function Lobby({ view, send, gps, onLeave }: Props) {
                 <li key={o.key}>
                   <label htmlFor={`opt-${o.key}`}>
                     {o.label}
-                    {o.hint && <span className="hint">{o.hint}</span>}
+                    {o.key === "finalRadius" && effectiveFinalRadius(cfg) < cfg.finalRadius ? (
+                      <span className="hint">Será de {Math.round(effectiveFinalRadius(cfg))}&nbsp;m: como mucho la mitad de la zona</span>
+                    ) : (
+                      o.hint && <span className="hint">{o.hint}</span>
+                    )}
                   </label>
                   <select id={`opt-${o.key}`} disabled={!isHost} value={cfg[o.key]} onChange={(e) => setConfig({ [o.key]: Number(e.target.value) })}>
                     {!o.values.some(([v]) => v === cfg[o.key]) && <option value={cfg[o.key]}>{cfg[o.key]}</option>}

@@ -315,7 +315,8 @@ export function currentZone(s: GameState, now: number) {
 }
 
 function outside(fix: Fix, c: Circle): boolean {
-  return distance(fix, c.center) - Math.min(fix.acc, MAX_ACCURACY_SLACK) > c.radius;
+  // GPS error is forgiven up to 30 m, but never more than half the zone: in a 25 m zone that would be most of it.
+  return distance(fix, c.center) - Math.min(fix.acc, MAX_ACCURACY_SLACK, c.radius / 2) > c.radius;
 }
 
 /** Advances timers. Call every few seconds and after every message. */
