@@ -1,0 +1,27 @@
+{
+  "name": "seekhunt",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "concurrently -n server,web -c magenta,cyan \"npm run dev -w @seekhunt/server\" \"npm run dev -w @seekhunt/web\"",
+    "build": "npm run build -w @seekhunt/web",
+    "test": "vitest run",
+    "typecheck": "tsc -p packages/shared && tsc -p apps/server && tsc -p apps/web"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20261022.1",
+    "@types/geojson": "^7946.0.16",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.2",
+    "concurrently": "^10.0.6",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.5",
+    "vitest": "^5.0.5",
+    "wrangler": "^4.152.0"
+  }
+}
