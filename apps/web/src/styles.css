@@ -67,10 +67,8 @@ button { touch-action: manipulation; }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
 /* Type roles */
-.label {
-  font-size: 0.72rem; font-weight: 650; letter-spacing: 0.08em; text-transform: uppercase;
-  font-stretch: var(--narrow); color: var(--ink-3);
-}
+/* Small sentence-case captions; the condensed caps are reserved for the clock, codes and headlines. */
+.label { font-size: 0.82rem; font-weight: 600; color: var(--ink-3); }
 .display { font-stretch: var(--narrow); font-weight: 800; text-transform: uppercase; letter-spacing: -0.01em; line-height: 0.92; text-wrap: balance; }
 .num { font-stretch: var(--narrow); font-variant-numeric: tabular-nums; font-weight: 700; letter-spacing: 0.01em; }
 .muted { color: var(--ink-2); }
@@ -97,6 +95,15 @@ button { touch-action: manipulation; }
   background: var(--paper); color: var(--ink); box-shadow: var(--shadow);
 }
 .icon-btn:active { transform: scale(0.96); }
+@media (hover: hover) {
+  .btn:hover:not(:disabled) { filter: brightness(1.12); }
+  .btn-soft:hover:not(:disabled), .btn-text:hover:not(:disabled) { filter: none; background: var(--line); }
+  .btn-text:hover:not(:disabled) { background: none; color: var(--ink); }
+  .icon-btn:hover:not(:disabled), .room-chip:hover { box-shadow: 0 0 0 1.5px var(--ink), var(--shadow); }
+  .icon-btn.plain:hover { box-shadow: none; color: var(--ink); }
+  .seg button:hover:not([aria-pressed="true"]):not(:disabled) { color: var(--ink); }
+  .disclosure:hover svg { color: var(--ink); }
+}
 .icon-btn.plain { box-shadow: none; background: transparent; width: 44px; height: 44px; color: var(--ink-3); margin: 0 -8px 0 -4px; }
 
 /* Inputs */
@@ -161,7 +168,6 @@ input[type="range"] { width: 100%; accent-color: var(--ink); height: 28px; margi
 @keyframes ring-in { from { transform: scale(1.12); opacity: 0; } }
 .hero-copy { display: flex; flex-direction: column; gap: 14px; }
 .hero-copy h1 { font-size: clamp(2.9rem, 13vw, 4.6rem); }
-.hero-copy h1 em { font-style: normal; color: var(--blaze-text); }
 .hero-copy p { color: var(--ink-2); max-width: 34ch; font-size: 1.05rem; }
 .join { display: flex; flex-direction: column; gap: 14px; }
 .or { display: flex; align-items: center; gap: 12px; color: var(--ink-3); font-size: 0.85rem; }
@@ -212,7 +218,7 @@ input[type="range"] { width: 100%; accent-color: var(--ink); height: 28px; margi
 @keyframes spin { to { transform: rotate(360deg); } }
 
 /* ─── Sheets & dialogs ─── */
-.dialog-scrim { position: fixed; inset: 0; z-index: 70; background: var(--scrim); display: flex; align-items: flex-end; justify-content: center; animation: fade 0.18s; }
+.dialog-scrim { position: fixed; inset: 0; z-index: 70; overscroll-behavior: contain; background: var(--scrim); display: flex; align-items: flex-end; justify-content: center; animation: fade 0.18s; }
 .dialog {
   width: min(480px, 100%); background: var(--paper); border-radius: 22px 22px 0 0;
   padding: 24px var(--gutter-r) calc(20px + var(--safe-b)) var(--gutter-l); display: flex; flex-direction: column; gap: 10px;
@@ -373,11 +379,11 @@ body:has(.play) .toasts { top: calc(140px + var(--safe-t)); }
 
 .result { display: flex; flex-direction: column; gap: 6px; }
 .result h2 { font-size: 2.4rem; }
-.standings { list-style: none; margin: 4px 0 0; padding: 0; display: flex; flex-direction: column; max-height: 30vh; overflow-y: auto; }
+.standings { list-style: none; margin: 4px 0 0; padding: 0; display: flex; flex-direction: column; max-height: 30vh; overflow-y: auto; overscroll-behavior: contain; }
 .standings li { display: flex; align-items: center; gap: 12px; min-height: 48px; border-bottom: 1px solid var(--line); }
 .standings li:last-child { border-bottom: 0; }
 .standings .who { flex: 1; font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.badge { font-size: 0.72rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; font-stretch: var(--narrow); padding: 4px 8px; border-radius: 6px; background: var(--fill); color: var(--ink-2); }
+.badge { font-size: 0.8rem; font-weight: 600; padding: 4px 9px; border-radius: 6px; background: var(--fill); color: var(--ink-2); }
 .badge.win { background: var(--blaze); color: var(--on-blaze); }
 
 /* ─── Catching ─── */
@@ -392,6 +398,7 @@ body:has(.play) .toasts { top: calc(140px + var(--safe-t)); }
 }
 .qr-full .qr { box-shadow: none; }
 .qr-full p { color: #4b5059; max-width: 30ch; font-size: 0.92rem; }
+.qr-full .btn { background: #121417; color: #fff; }
 
 .scanner { position: fixed; inset: 0; z-index: 80; background: #000; color: #fff; display: flex; flex-direction: column; }
 .scanner-top {

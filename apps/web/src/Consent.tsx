@@ -26,7 +26,6 @@ export function Consent({ onAccept, onLeave }: { onAccept: () => void; onLeave: 
   return (
     <div className="dialog-scrim">
       <div className="dialog" role="dialog" aria-modal="true" aria-labelledby="consent-title" style={{ maxHeight: "92vh", overflowY: "auto" }}>
-        <span className="label">Antes de jugar</span>
         <h3 id="consent-title">Tu ubicación y las normas</h3>
         <ul className="rules">
           <li>
@@ -38,7 +37,7 @@ export function Consent({ onAccept, onLeave }: { onAccept: () => void; onLeave: 
           <li>
             <ShieldCheck size={18} />
             <span>
-              <b>No guardamos historial.</b> La sala y las posiciones se borran 12 h después de la última actividad. Puedes retirar el permiso en los ajustes del navegador.
+              <b>No guardamos historial.</b> La sala y las posiciones se borran 12&nbsp;h después de la última actividad. Puedes retirar el permiso en los ajustes del navegador.
             </span>
           </li>
           <li>
@@ -50,7 +49,7 @@ export function Consent({ onAccept, onLeave }: { onAccept: () => void; onLeave: 
           <li>
             <Footprints size={18} />
             <span>
-              <b>Se juega a pie.</b> Nada de bici, patinete ni coche. Por encima de 25 km/h no se puede pillar.
+              <b>Se juega a pie.</b> Nada de bici, patinete ni coche. Por encima de 25&nbsp;km/h no se puede pillar.
             </span>
           </li>
           <li>
@@ -62,7 +61,7 @@ export function Consent({ onAccept, onLeave }: { onAccept: () => void; onLeave: 
           <li>
             <LifeBuoy size={18} />
             <span>
-              <b>Si algo va mal, pulsa SOS</b> y todos verán dónde estás. En una emergencia, llama al 112.
+              <b>Si algo va mal, pulsa SOS</b> y todos verán dónde estás. En una emergencia, llama al&nbsp;112.
             </span>
           </li>
         </ul>

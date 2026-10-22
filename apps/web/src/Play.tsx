@@ -133,7 +133,7 @@ export function Play({ view, send, gps, clockOffset, ask }: Props) {
           <button
             className="icon-btn sos"
             aria-label="Pedir ayuda (SOS)"
-            onClick={() => ask({ title: "¿Pedir ayuda?", body: "Todos los jugadores verán tu posición exacta y recibirán un aviso. Úsalo si te has hecho daño o te sientes en peligro. Si es una emergencia, llama al 112.", confirm: "Enviar SOS", danger: true, onConfirm: () => send({ t: "sos" }) })}
+            onClick={() => ask({ title: "¿Pedir ayuda?", body: "Todos los jugadores verán tu posición exacta y recibirán un aviso. Úsalo si te has hecho daño o te sientes en peligro. Si es una emergencia, llama al\u00a0112.", confirm: "Enviar SOS", danger: true, onConfirm: () => send({ t: "sos" }) })}
           >
             <LifeBuoy size={20} />
           </button>
@@ -141,7 +141,7 @@ export function Play({ view, send, gps, clockOffset, ask }: Props) {
       </div>
       {SIM_MODE && !spectating && (
         <div className="sim-chip">
-          <span className="pill">Simulación · toca para moverte</span>
+          <span className="pill">Simulación: toca el mapa para moverte</span>
         </div>
       )}
 
@@ -175,7 +175,7 @@ export function Play({ view, send, gps, clockOffset, ask }: Props) {
           </Notice>
         ))}
         {gps.error && !SIM_MODE && <Notice tone="warn">{gps.error}</Notice>}
-        {fast && !spectating && <Notice tone="warn">Vas a más de 25 km/h. En SeekHunt se juega a pie: nada de bici, patinete ni coche.</Notice>}
+        {fast && !spectating && <Notice tone="warn">Vas a más de 25&nbsp;km/h. En SeekHunt se juega a pie: nada de bici, patinete ni coche.</Notice>}
         {edgeWarning && <Notice tone="warn">{edgeWarning}</Notice>}
         {ended ? (
           <Results view={view} isHost={isHost} send={send} />
@@ -270,10 +270,10 @@ function Results({ view, isHost, send }: { view: GameView; isHost: boolean; send
   const sorted = [...view.players].sort((a, b) => Number(winners.has(b.id)) - Number(winners.has(a.id)));
   return (
     <div className="result">
-      <span className="label row" style={{ gap: 6 }}>
-        <Trophy size={14} /> Resultado
-      </span>
-      <h2 className="display">{iWon ? "Has ganado" : names.length ? `Gana ${names.join(", ")}` : "Sin ganador"}</h2>
+      <h2 className="display row" style={{ gap: 10 }}>
+        {iWon && <Trophy size={30} strokeWidth={2.5} aria-hidden />}
+        {iWon ? "Has ganado" : names.length ? `Gana ${names.join(", ")}` : "Sin ganador"}
+      </h2>
       <p className="muted">{view.winReason}</p>
       <ul className="standings">
         {sorted.map((p) => (

@@ -22,11 +22,21 @@ export function CatchQr({ room, code, size = 132 }: { room: string; code: string
 
 /** Full-screen QR so the seeker can scan it from arm's length, even in sunlight. */
 export function QrFullscreen({ room, code, onClose }: { room: string; code: string; onClose: () => void }) {
+  const close = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    close.current?.focus();
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
   return (
     <div className="qr-full" onClick={onClose} role="dialog" aria-modal="true" aria-label="Código de captura a pantalla completa">
       <CatchQr room={room} code={code} size={Math.min(window.innerWidth - 48, 420)} />
       <div className="capture-code num" translate="no">{code}</div>
-      <p>Sube el brillo y deja que el cazador lo escanee. Toca para cerrar.</p>
+      <p>Sube el brillo y deja que el cazador lo escanee.</p>
+      <button ref={close} className="btn btn-sm" onClick={onClose}>
+        Cerrar
+      </button>
     </div>
   );
 }

@@ -90,7 +90,7 @@ function Home({ initialCode, name, onEnter }: { initialCode: string; name: strin
         <h1 className="display">
           Escóndete.
           <br />
-          <em>La zona</em> se cierra.
+          La zona se cierra.
         </h1>
         <p>Escondite por GPS para jugar con amigos en tu barrio. Un cazador, una zona que encoge cada pocos minutos y un único superviviente.</p>
       </div>
@@ -105,7 +105,7 @@ function Home({ initialCode, name, onEnter }: { initialCode: string; name: strin
       >
         <label className="field">
           <span className="label">Tu nombre</span>
-          <input id="name" className="input" value={n} maxLength={20} onChange={(e) => setN(e.target.value)} placeholder="Cómo te verán los demás" autoComplete="nickname" />
+          <input id="name" className="input" value={n} maxLength={20} onChange={(e) => setN(e.target.value)} name="nickname" placeholder="Ej.: Lucía…" autoComplete="nickname" />
         </label>
         <button type="button" className="btn btn-block" disabled={!!busy} onClick={() => run("create", async () => onEnter(await createRoom(), n.trim()))}>
           {busy === "create" ? <span className="spinner" /> : "Crear partida"}

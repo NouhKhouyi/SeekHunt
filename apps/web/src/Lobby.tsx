@@ -36,6 +36,8 @@ const ADVANCED: { key: NumKey; label: string; hint?: string; values: [number, st
 
 const totalMinutes = (c: GameConfig) => Math.round((c.hideSeconds + c.shrinkCount * c.shrinkIntervalSeconds + c.shrinkDurationSeconds + c.finalHoldSeconds) / 60);
 const fmtKm2 = (r: number) => (Math.PI * r * r) / 1e6;
+const NUM0 = new Intl.NumberFormat("es-ES", { maximumFractionDigits: 0 });
+const NUM2 = new Intl.NumberFormat("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 export function Lobby({ view, send, gps, onLeave }: Props) {
   const isHost = view.me.id === view.hostId;
@@ -124,7 +126,6 @@ export function Lobby({ view, send, gps, onLeave }: Props) {
       <section className="panel">
         <div className="grabber" />
         <header className="panel-head">
-          <span className="label">Sala {view.code}</span>
           <h1 className="display">{isHost ? "Prepara la partida" : "Esperando al anfitrión"}</h1>
         </header>
 
@@ -137,7 +138,7 @@ export function Lobby({ view, send, gps, onLeave }: Props) {
         <div className="block">
           <div className="block-head">
             <h2>Zona de juego</h2>
-            <span className="faint small num">{area < 1 ? `${(area * 100).toFixed(0)} ha` : `${area.toFixed(2).replace(".", ",")} km²`}</span>
+            <span className="faint small num">{area < 1 ? `${NUM0.format(area * 100)} ha` : `${NUM2.format(area)} km²`}</span>
           </div>
           <div className="row spread">
             <div className="big-value num">
@@ -165,7 +166,7 @@ export function Lobby({ view, send, gps, onLeave }: Props) {
           <div className="block-head">
             <h2>Jugadores</h2>
             <span className="faint small">
-              {seekers} cazador{seekers === 1 ? "" : "es"} · {hiders} escondido{hiders === 1 ? "" : "s"}
+              {seekers} cazador{seekers === 1 ? "" : "es"} y {hiders} escondido{hiders === 1 ? "" : "s"}
             </span>
           </div>
           <ul className="players">
@@ -227,7 +228,7 @@ export function Lobby({ view, send, gps, onLeave }: Props) {
             <span>
               {cfg.shrinkCount} cierres × {Math.round(cfg.shrinkIntervalSeconds / 60)}′
             </span>
-            <span>{Math.round(cfg.zone.radius)} → {Math.round(cfg.finalRadius)} m</span>
+            <span>{Math.round(cfg.zone.radius)} → {Math.round(cfg.finalRadius)}&nbsp;m</span>
           </div>
         </div>
 
