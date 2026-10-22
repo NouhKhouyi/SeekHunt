@@ -105,7 +105,7 @@ export function Lobby({ view, send, gps, onLeave }: Props) {
             <ChevronLeft size={22} />
           </button>
           <button className="room-chip" onClick={share} aria-label={`Compartir código ${view.code}`}>
-            <span className="num">{view.code}</span>
+            <span className="num" translate="no">{view.code}</span>
             <span className="chip-icon">{copied ? <Check size={18} /> : <Share2 size={18} />}</span>
           </button>
         </div>

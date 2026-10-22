@@ -1,4 +1,4 @@
-import { AlertTriangle, Bell, CircleDot, Crosshair, Flag, Radar, UserPlus } from "lucide-react";
+import { AlertTriangle, Bell, CircleDot, Crosshair, Flag, LifeBuoy, Radar, UserPlus } from "lucide-react";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import type { Toast } from "./net";
 
@@ -26,7 +26,7 @@ export const initials = (name: string) =>
     .map((w) => w[0]!.toUpperCase())
     .join("");
 
-const TOAST_ICON = { info: UserPlus, zone: CircleDot, ping: Radar, catch: Crosshair, elim: AlertTriangle, warn: Bell, end: Flag };
+const TOAST_ICON = { info: UserPlus, zone: CircleDot, ping: Radar, catch: Crosshair, elim: AlertTriangle, warn: Bell, end: Flag, sos: LifeBuoy };
 
 export function Toasts({ toasts }: { toasts: Toast[] }) {
   return (
@@ -59,7 +59,7 @@ export function CodeInput({ length, value, onChange, numeric, label, autoFocus }
   const [focused, setFocused] = useState(false);
   const clean = (v: string) => (numeric ? v.replace(/\D/g, "") : v.toUpperCase().replace(/[^A-Z0-9]/g, "")).slice(0, length);
   return (
-    <div className={`code${focused ? " focused" : ""}`}>
+    <div className={`code${focused ? " focused" : ""}`} translate="no">
       {Array.from({ length }, (_, i) => (
         <div key={i} className={`code-cell num${value[i] ? " filled" : ""}${i === Math.min(value.length, length - 1) ? " active" : ""}`} aria-hidden>
           {value[i] ?? ""}
@@ -151,7 +151,7 @@ export function Loading() {
   return (
     <div className="conn" style={{ top: "50%", bottom: "auto" }}>
       <span className="pill">
-        <span className="spinner" /> Cargando
+        <span className="spinner" /> Cargando…
       </span>
     </div>
   );

@@ -79,7 +79,7 @@ function Home({ initialCode, name, onEnter }: { initialCode: string; name: strin
 
   return (
     <main className="home">
-      <div className="brand">
+      <div className="brand" translate="no">
         <Logo />
         SeekHunt
       </div>

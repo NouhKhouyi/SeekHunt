@@ -1,9 +1,14 @@
-import type { LatLng } from "@seekhunt/shared";
+import { type LatLng, WALKING_SPEED_LIMIT } from "@seekhunt/shared";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 export interface MyFix extends LatLng {
   acc: number;
+  /** m/s as reported by the device, when it knows. */
+  speed?: number;
 }
+
+/** 25 km/h: faster than running, so the player is on wheels. Same rule the server enforces on catches. */
+export const WALKING_LIMIT = WALKING_SPEED_LIMIT;
 
 export const SIM_MODE = new URLSearchParams(location.search).has("sim");
 
@@ -32,7 +37,7 @@ export function useMyLocation(enabled: boolean) {
     const id = navigator.geolocation.watchPosition(
       (p) => {
         setError(null);
-        setFix({ lat: p.coords.latitude, lng: p.coords.longitude, acc: p.coords.accuracy });
+        setFix({ lat: p.coords.latitude, lng: p.coords.longitude, acc: p.coords.accuracy, speed: p.coords.speed ?? undefined });
       },
       (e) => setError(describe(e)),
       { enableHighAccuracy: true, maximumAge: 3000, timeout: 20_000 },

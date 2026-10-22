@@ -10,7 +10,7 @@ export interface MapPlayer {
   id: string;
   name: string;
   pos: LatLng;
-  kind: "me" | "seeker" | "hider" | "revealed";
+  kind: "me" | "seeker" | "hider" | "revealed" | "sos";
 }
 
 export interface MapPing {

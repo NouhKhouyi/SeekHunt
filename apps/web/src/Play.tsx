@@ -1,10 +1,11 @@
 import { buildSchedule, type ClientMsg, distance, gameDeadline, type GameView, zoneAt } from "@seekhunt/shared";
-import { Focus, LocateFixed, Radar, Trophy, Users } from "lucide-react";
-import { useMemo, useRef, useState } from "react";
+import { Focus, LifeBuoy, LocateFixed, Radar, ScanLine, Trophy, Users } from "lucide-react";
+import { useCallback, useMemo, useRef, useState } from "react";
+import { CatchQr, QrFullscreen, Scanner } from "./Catch";
 import { GameMap, type MapHandle, type MapPing, type MapPlayer } from "./GameMap";
-import { SIM_MODE } from "./location";
+import { SIM_MODE, WALKING_LIMIT } from "./location";
 import type { Gps } from "./Room";
-import { CodeInput, type ConfirmRequest, fmt, initials, Notice, Timeline, useNow } from "./ui";
+import { type ConfirmRequest, fmt, initials, Notice, Timeline, useNow } from "./ui";
 
 interface Props {
   view: GameView;
@@ -47,9 +48,12 @@ export function Play({ view, send, gps, clockOffset, ask }: Props) {
       id: p.id,
       name: p.name,
       pos: p.loc!,
-      kind: p.role === "seeker" ? "seeker" : p.visibleBecause === "outOfZone" || p.visibleBecause === "stale" ? "revealed" : "hider",
+      kind: p.sos ? "sos" : p.role === "seeker" ? "seeker" : p.visibleBecause === "outOfZone" || p.visibleBecause === "stale" ? "revealed" : "hider",
     }));
   if (fix) players.push({ id: me.id, name: "Tú", pos: fix, kind: "me" });
+  const mySos = !!view.players.find((p) => p.id === me.id)?.sos;
+  const othersSos = view.players.filter((p) => p.sos && p.id !== me.id);
+  const fast = (fix?.speed ?? 0) > WALKING_LIMIT;
 
   const byId = new Map(view.players.map((p) => [p.id, p]));
   const pings: MapPing[] = view.pings.map((p) => ({ area: p.area, label: byId.get(p.playerId)?.name ?? "", kind: byId.get(p.playerId)?.role ?? "hider" }));
@@ -125,6 +129,15 @@ export function Play({ view, send, gps, clockOffset, ask }: Props) {
         <button className="icon-btn" aria-label="Ver toda la zona" onClick={() => mapRef.current?.fit(current)}>
           <Focus size={20} />
         </button>
+        {!ended && !mySos && (
+          <button
+            className="icon-btn sos"
+            aria-label="Pedir ayuda (SOS)"
+            onClick={() => ask({ title: "¿Pedir ayuda?", body: "Todos los jugadores verán tu posición exacta y recibirán un aviso. Úsalo si te has hecho daño o te sientes en peligro. Si es una emergencia, llama al 112.", confirm: "Enviar SOS", danger: true, onConfirm: () => send({ t: "sos" }) })}
+          >
+            <LifeBuoy size={20} />
+          </button>
+        )}
       </div>
       {SIM_MODE && !spectating && (
         <div className="sim-chip">
@@ -134,12 +147,40 @@ export function Play({ view, send, gps, clockOffset, ask }: Props) {
 
       <footer className="sheet">
         <div className="grabber" />
+        {mySos && (
+          <Notice
+            tone="danger"
+            action={
+              <button className="notice-action" onClick={() => send({ t: "sosClear" })}>
+                Estoy bien
+              </button>
+            }
+          >
+            Has pedido ayuda. Todos ven tu posición.
+          </Notice>
+        )}
+        {othersSos.map((p) => (
+          <Notice
+            key={p.id}
+            tone="danger"
+            action={
+              p.loc && (
+                <button className="notice-action" onClick={() => mapRef.current?.flyTo(p.loc!)}>
+                  Ver
+                </button>
+              )
+            }
+          >
+            {p.name} necesita ayuda.
+          </Notice>
+        ))}
         {gps.error && !SIM_MODE && <Notice tone="warn">{gps.error}</Notice>}
+        {fast && !spectating && <Notice tone="warn">Vas a más de 25 km/h. En SeekHunt se juega a pie: nada de bici, patinete ni coche.</Notice>}
         {edgeWarning && <Notice tone="warn">{edgeWarning}</Notice>}
         {ended ? (
           <Results view={view} isHost={isHost} send={send} />
         ) : me.role === "seeker" ? (
-          <SeekerSheet view={view} send={send} />
+          <SeekerSheet view={view} send={send} fast={fast} />
         ) : (
           <HiderSheet view={view} send={send} ask={ask} />
         )}
@@ -159,8 +200,15 @@ export function Play({ view, send, gps, clockOffset, ask }: Props) {
   );
 }
 
-function SeekerSheet({ view, send }: { view: GameView; send: (m: ClientMsg) => void }) {
-  const [code, setCode] = useState("");
+function SeekerSheet({ view, send, fast }: { view: GameView; send: (m: ClientMsg) => void; fast: boolean }) {
+  const [scanning, setScanning] = useState(false);
+  const onCode = useCallback(
+    (code: string) => {
+      send({ t: "catch", code });
+      setScanning(false);
+    },
+    [send],
+  );
   if (view.phase === "hiding") {
     return (
       <div className="result">
@@ -170,28 +218,19 @@ function SeekerSheet({ view, send }: { view: GameView; send: (m: ClientMsg) => v
     );
   }
   return (
-    <form
-      className="result"
-      onSubmit={(e) => {
-        e.preventDefault();
-        if (code.length !== 4) return;
-        send({ t: "catch", code });
-        setCode("");
-      }}
-    >
-      <span className="label">¿Has pillado a alguien?</span>
-      <div className="catch-row">
-        <CodeInput length={4} numeric value={code} onChange={setCode} label="Código de captura" />
-        <button className="btn btn-blaze" disabled={code.length !== 4}>
-          Pillar
-        </button>
-      </div>
-      <p className="faint small">Pídele su código de 4 cifras. Aparece en su pantalla.</p>
-    </form>
+    <div className="result">
+      <span className="label">¿Has tocado a alguien?</span>
+      <button className="btn btn-blaze btn-block" onClick={() => setScanning(true)} disabled={fast}>
+        <ScanLine size={20} /> Escanear su QR para pillar
+      </button>
+      <p className="faint small">{fast ? "Vas demasiado rápido. Solo se puede pillar a pie." : "Escanea el QR de su pantalla o escribe sus 4 cifras. Tenéis que estar juntos."}</p>
+      {scanning && <Scanner room={view.code} onCode={onCode} onClose={() => setScanning(false)} />}
+    </div>
   );
 }
 
 function HiderSheet({ view, send, ask }: { view: GameView; send: (m: ClientMsg) => void; ask: (r: ConfirmRequest) => void }) {
+  const [full, setFull] = useState(false);
   if (view.me.status !== "active") {
     return (
       <div className="result">
@@ -200,19 +239,24 @@ function HiderSheet({ view, send, ask }: { view: GameView; send: (m: ClientMsg) 
       </div>
     );
   }
+  const code = view.me.catchCode!;
   return (
-    <div className="row spread" style={{ alignItems: "flex-end" }}>
-      <div className="result">
-        <span className="label">Tu código de captura</span>
-        <div className="capture-code num">{view.me.catchCode}</div>
-        <p className="faint small">Enséñalo solo si el cazador te toca.</p>
-      </div>
-      <button
-        className="btn btn-soft btn-sm"
-        onClick={() => ask({ title: "¿Te han pillado?", body: "Quedarás fuera de la partida. Úsalo si el cazador no puede introducir tu código.", confirm: "Sí, me han pillado", danger: true, onConfirm: () => send({ t: "surrender" }) })}
-      >
-        Me han pillado
+    <div className="hider-sheet">
+      <button className="qr-button" onClick={() => setFull(true)} aria-label="Ampliar código QR">
+        <CatchQr room={view.code} code={code} size={104} />
       </button>
+      <div className="result">
+        <span className="label">Si te pillan</span>
+        <div className="capture-code num" translate="no">{code}</div>
+        <button
+          className="btn btn-text btn-sm"
+          style={{ alignSelf: "flex-start", padding: 0 }}
+          onClick={() => ask({ title: "¿Te han pillado?", body: "Quedarás fuera de la partida. Úsalo solo si el cazador no puede escanear tu QR.", confirm: "Sí, me han pillado", danger: true, onConfirm: () => send({ t: "surrender" }) })}
+        >
+          Me han pillado
+        </button>
+      </div>
+      {full && <QrFullscreen room={view.code} code={code} onClose={() => setFull(false)} />}
     </div>
   );
 }

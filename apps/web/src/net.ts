@@ -1,5 +1,6 @@
 import type { ClientMsg, GameEvent, GameView, ServerMsg } from "@seekhunt/shared";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { cue } from "./sfx";
 
 export interface Identity {
   playerId: string;
@@ -107,7 +108,7 @@ export function useRoom(code: string, name: string): Connection {
         } else if (msg.t === "event") {
           const id = ++toastId.current;
           setToasts((t) => [...t.slice(-3), { ...msg.event, id }]);
-          if (msg.event.kind === "warn" || msg.event.kind === "zone" || msg.event.kind === "end") navigator.vibrate?.([200, 100, 200]);
+          cue(msg.event.kind);
           setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), msg.event.kind === "info" ? 3500 : 6000);
         }
       };

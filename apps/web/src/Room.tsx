@@ -1,5 +1,6 @@
 import type { MyFix } from "./location";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { Consent, hasConsent } from "./Consent";
 import { Lobby } from "./Lobby";
 import { useMyLocation, useReportLocation, useWakeLock } from "./location";
 import { useRoom } from "./net";
@@ -10,9 +11,18 @@ export default function Room({ code, name, onLeave }: { code: string; name: stri
   const conn = useRoom(code, name);
   const { view, send } = conn;
   const playing = view?.phase === "hiding" || view?.phase === "seeking";
-  const gps = useMyLocation(true);
+  const [consented, setConsented] = useState(hasConsent);
+  // No location request until the player has read what is shared and with whom.
+  const gps = useMyLocation(consented);
   const [confirm, setConfirm] = useState<ConfirmRequest | null>(null);
   useWakeLock(playing);
+  useEffect(() => {
+    const phase = { lobby: "Sala", hiding: "Escondite", seeking: "En juego", ended: "Resultado" }[view?.phase ?? "lobby"];
+    document.title = `${phase} ${code} · SeekHunt`;
+    return () => {
+      document.title = "SeekHunt";
+    };
+  }, [view?.phase, code]);
   const sendFix = useCallback((f: MyFix) => send({ t: "loc", lat: f.lat, lng: f.lng, acc: f.acc }), [send]);
   useReportLocation(conn.status === "open" ? gps.fix : null, sendFix);
 
@@ -36,7 +46,7 @@ export default function Room({ code, name, onLeave }: { code: string; name: stri
       {view && conn.status !== "open" && (
         <div className="conn">
           <span className="pill">
-            <span className="spinner" /> Reconectando
+            <span className="spinner" /> Reconectando…
           </span>
         </div>
       )}
@@ -48,6 +58,7 @@ export default function Room({ code, name, onLeave }: { code: string; name: stri
         <Play view={view} send={send} gps={gps} clockOffset={conn.clockOffset} ask={setConfirm} />
       )}
       <ConfirmDialog request={confirm} onClose={() => setConfirm(null)} />
+      {!consented && <Consent onAccept={() => setConsented(true)} onLeave={onLeave} />}
     </>
   );
 }

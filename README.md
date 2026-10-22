@@ -29,7 +29,17 @@ npm install
 npm run dev        # worker en :8787 y web en :5173 (con proxy de /api y /ws)
 npm test           # tests del motor
 npm run typecheck
-node scripts/smoke.mjs   # partida completa por WebSocket contra el servidor de desarrollo
+node scripts/smoke.mjs        # partida completa por WebSocket contra el servidor de desarrollo
+node scripts/a11y.mjs         # auditoría de accesibilidad (axe) de todas las pantallas, claro y oscuro
+node scripts/qr-roundtrip.mjs # comprueba que el escáner lee el QR de captura (camino zxing-wasm, como iPhone)
+```
+
+Los dos últimos usan el Microsoft Edge instalado mediante Playwright.
+
+**Lighthouse (móvil):** `npm run build`, luego `npx vite preview` en `apps/web` y por último:
+
+```bash
+npx lighthouse http://localhost:4173 --chrome-path="C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe" --form-factor=mobile --view
 ```
 
 **Probar sin salir de casa:** abre `http://localhost:5173/?sim` en varias pestañas. En modo simulación, tocar el mapa mueve a tu jugador.

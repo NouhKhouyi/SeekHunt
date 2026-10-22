@@ -21,8 +21,10 @@ export interface PlayerView {
   /** Present only when the viewer is allowed to see this player's position. */
   loc?: Fix;
   /** Why the position is visible: teammate, out of zone, stale signal, spectator... */
-  visibleBecause?: "self" | "teammate" | "outOfZone" | "stale" | "spectator" | "ping";
+  visibleBecause?: "self" | "teammate" | "outOfZone" | "stale" | "spectator" | "ping" | "sos";
   outOfZoneSince?: number | null;
+  /** Player asked for help: everybody sees them. */
+  sos?: boolean;
 }
 
 export interface Ping {
@@ -59,10 +61,12 @@ export type ClientMsg =
   | { t: "loc"; lat: number; lng: number; acc: number }
   | { t: "catch"; code: string }
   | { t: "surrender" }
+  | { t: "sos" }
+  | { t: "sosClear" }
   | { t: "end" }
   | { t: "reset" };
 
-export type EventKind = "info" | "zone" | "ping" | "catch" | "elim" | "warn" | "end";
+export type EventKind = "info" | "zone" | "ping" | "catch" | "elim" | "warn" | "end" | "sos";
 
 export interface GameEvent {
   kind: EventKind;

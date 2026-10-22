@@ -13,6 +13,13 @@ export const MAX_PLAYERS = 30;
 const MAX_PLAUSIBLE_SPEED = 60;
 /** Accuracy slack (m) granted before declaring someone out of the zone. */
 const MAX_ACCURACY_SLACK = 30;
+/** A catch is refused when both fresh fixes put the players further apart than this (plus their accuracy). */
+export const CATCH_MAX_DISTANCE = 80;
+const FRESH_FIX_MS = 30_000;
+/** 25 km/h: anything faster is a vehicle, and catching from a vehicle is not allowed. */
+export const WALKING_SPEED_LIMIT = 7;
+/** Heads-up before each shrink starts. */
+const SHRINK_WARNING_MS = 30_000;
 
 export interface PlayerState {
   id: string;
@@ -24,6 +31,10 @@ export interface PlayerState {
   loc?: Fix;
   catchCode: string | null;
   outOfZoneSince: number | null;
+  /** Set while the player has an active SOS: everybody sees their position. */
+  sosAt?: number | null;
+  /** Speed (m/s) derived from the last two accepted fixes. */
+  speed?: number;
 }
 
 export interface GameState {
@@ -43,6 +54,8 @@ export interface GameState {
   pings: Ping[];
   nextPingAt: number | null;
   announcedStep: number;
+  /** Highest shrink index already warned about (optional: rooms created before this field). */
+  warnedStep?: number;
   hidersAtStart: number;
 }
 
@@ -172,8 +185,10 @@ export function handle(s: GameState, playerId: string, msg: ClientMsg, now: numb
       for (const p of all) {
         p.status = "active";
         p.outOfZoneSince = null;
+        p.sosAt = null;
         p.catchCode = p.role === "hider" ? codes.pop()! : null;
       }
+      s.warnedStep = 0;
       s.seed = Math.floor(rand() * 2 ** 32);
       s.phase = "hiding";
       s.startedAt = now;
@@ -198,6 +213,8 @@ export function handle(s: GameState, playerId: string, msg: ClientMsg, now: numb
       if (prev) {
         const dt = (now - prev.ts) / 1000;
         if (dt < 30 && distance(prev, fix) > Math.max(MAX_PLAUSIBLE_SPEED * dt, prev.acc + fix.acc)) return [];
+        // Ignore jitter: only measure speed over a real time window and beyond GPS noise.
+        if (dt >= 2) me.speed = Math.max(0, distance(prev, fix) - prev.acc - fix.acc) / dt;
       }
       me.loc = fix;
       return [];
@@ -207,9 +224,28 @@ export function handle(s: GameState, playerId: string, msg: ClientMsg, now: numb
       requirePhase(s, "seeking");
       if (me.role !== "seeker" || me.status !== "active") throw new GameError("Solo los cazadores pueden pillar");
       const victim = activeHiders(s).find((p) => p.catchCode === String(msg.code).trim());
-      if (!victim) throw new GameError("Código incorrecto");
+      if (!victim) throw new GameError("Código incorrecto. Revisa las 4 cifras.");
+      if (me.loc && now - me.loc.ts < FRESH_FIX_MS && (me.speed ?? 0) > WALKING_SPEED_LIMIT) {
+        throw new GameError("Vas demasiado rápido. Solo se puede pillar a pie.");
+      }
+      // Stops codes being passed around by message: both phones must roughly agree they're together.
+      if (me.loc && victim.loc && now - me.loc.ts < FRESH_FIX_MS && now - victim.loc.ts < FRESH_FIX_MS) {
+        const gap = distance(me.loc, victim.loc) - me.loc.acc - victim.loc.acc;
+        if (gap > CATCH_MAX_DISTANCE) throw new GameError(`Estáis a unos ${Math.round(distance(me.loc, victim.loc))} m. Tienes que tocar a ${victim.name} para pillarle.`);
+      }
       return [...markCaught(s, victim, me), ...checkEnd(s, now)];
     }
+
+    case "sos":
+      requirePhase(s, "hiding", "seeking");
+      if (me.sosAt) return [];
+      me.sosAt = now;
+      return [{ kind: "sos", text: `${me.name} necesita ayuda. Su posición es visible para todos.` }];
+
+    case "sosClear":
+      if (!me.sosAt) return [];
+      me.sosAt = null;
+      return [{ kind: "info", text: `${me.name} está bien` }];
 
     case "surrender": {
       requirePhase(s, "hiding", "seeking");
@@ -233,6 +269,7 @@ export function handle(s: GameState, playerId: string, msg: ClientMsg, now: numb
         p.status = "active";
         p.catchCode = null;
         p.outOfZoneSince = null;
+        p.sosAt = null;
       }
       return [{ kind: "info", text: "Nueva partida: de vuelta al lobby" }];
   }
@@ -295,6 +332,11 @@ export function tick(s: GameState, now: number, rand: () => number = Math.random
     s.announcedStep = z.zone.index;
     events.push({ kind: "zone", text: `La zona se está cerrando (${z.zone.index}/${s.config.shrinkCount})` });
   }
+  const upcoming = z.zone.index + 1;
+  if (z.zone.nextShrinkAt !== null && now >= z.zone.nextShrinkAt - SHRINK_WARNING_MS && (s.warnedStep ?? 0) < upcoming) {
+    s.warnedStep = upcoming;
+    events.push({ kind: "zone", text: "La zona se cierra en 30 s. Ve hacia el círculo discontinuo." });
+  }
 
   const grace = s.config.outOfZoneGraceSeconds * 1000;
   for (const p of activeHiders(s)) {
@@ -339,9 +381,10 @@ export function viewFor(s: GameState, viewerId: string, now: number): GameView {
   const staleMs = s.config.staleLocationSeconds * 1000;
 
   const players: PlayerView[] = list(s).map((p) => {
-    const v: PlayerView = { id: p.id, name: p.name, role: p.role, status: p.status, connected: p.connected, outOfZoneSince: p.outOfZoneSince };
+    const v: PlayerView = { id: p.id, name: p.name, role: p.role, status: p.status, connected: p.connected, outOfZoneSince: p.outOfZoneSince, sos: !!p.sosAt };
     let because: PlayerView["visibleBecause"];
     if (p.id === viewerId) because = "self";
+    else if (p.sosAt) because = "sos";
     else if (spectator) because = "spectator";
     else if (p.role === "seeker" && me.role === "seeker") because = "teammate";
     else if (me.role === "seeker" && p.role === "hider" && p.status === "active" && s.phase === "seeking") {

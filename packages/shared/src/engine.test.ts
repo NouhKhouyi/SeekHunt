@@ -124,6 +124,36 @@ describe("engine", () => {
     expect(viewFor(s, id("ana"), 120_000).pings.every((p) => p.playerId === id("seek"))).toBe(true);
   });
 
+  it("refuses a catch when both fresh fixes say the players are far apart", () => {
+    const s = startedGame();
+    tick(s, 60_000);
+    handle(s, id("ana"), { t: "loc", ...offset(center, 400, 0), acc: 5 }, 60_000);
+    handle(s, id("seek"), { t: "loc", ...center, acc: 5 }, 60_000);
+    const code = s.players[id("ana")]!.catchCode!;
+    expect(() => handle(s, id("seek"), { t: "catch", code }, 61_000)).toThrow(/Estáis a unos 400 m/);
+    // With a stale fix on one side we can't tell, so the code wins.
+    handle(s, id("seek"), { t: "catch", code }, 100_000);
+    expect(s.players[id("ana")]!.status).toBe("caught");
+  });
+
+  it("SOS reveals the player to everybody until cleared", () => {
+    const s = startedGame();
+    tick(s, 60_000);
+    const events = handle(s, id("ana"), { t: "sos" }, 61_000);
+    expect(events[0]!.kind).toBe("sos");
+    expect(viewFor(s, id("bea"), 61_000).players.find((p) => p.id === id("ana"))!.visibleBecause).toBe("sos");
+    handle(s, id("ana"), { t: "sosClear" }, 62_000);
+    expect(viewFor(s, id("bea"), 62_000).players.find((p) => p.id === id("ana"))!.loc).toBeUndefined();
+  });
+
+  it("warns 30 s before each shrink, once", () => {
+    const s = startedGame(["seek", "ana", "bea"], { shrinkIntervalSeconds: 120 });
+    tick(s, 60_000);
+    expect(tick(s, 60_000 + 89_000).some((e) => e.text.includes("30 s"))).toBe(false);
+    expect(tick(s, 60_000 + 90_000).some((e) => e.text.includes("30 s"))).toBe(true);
+    expect(tick(s, 60_000 + 95_000).some((e) => e.text.includes("30 s"))).toBe(false);
+  });
+
   it("discards physically impossible jumps", () => {
     const s = startedGame();
     handle(s, id("ana"), { t: "loc", ...offset(center, 5000, 0), acc: 5 }, 1000);
