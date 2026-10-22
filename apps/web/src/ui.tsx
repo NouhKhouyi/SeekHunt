@@ -184,9 +184,9 @@ export function Timeline({ config, elapsed }: { config: { hideSeconds: number; s
 export function Logo() {
   return (
     <svg viewBox="0 0 32 32" aria-hidden>
-      <circle cx="16" cy="16" r="14" fill="none" stroke="currentColor" strokeWidth="2.5" strokeDasharray="5 3.2" />
-      <circle cx="18" cy="14.5" r="7.5" fill="none" stroke="currentColor" strokeWidth="2.5" />
-      <circle cx="19" cy="13.5" r="3" fill="var(--blaze)" />
+      {/* The play area, and the last zone left inside it. */}
+      <circle cx="16" cy="16" r="13" fill="none" stroke="currentColor" strokeWidth="3" />
+      <circle cx="19.5" cy="12.5" r="5" fill="var(--blaze)" />
     </svg>
   );
 }

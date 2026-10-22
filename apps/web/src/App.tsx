@@ -2,7 +2,7 @@ import { ArrowRight } from "lucide-react";
 import { lazy, Suspense, useEffect, useState } from "react";
 import { createRoom, getSavedName, roomExists, saveName } from "./net";
 import { CodeInput, Loading, Logo, Notice } from "./ui";
-import { ZoneRings } from "./ZoneRings";
+import { Hero } from "./Hero";
 
 // The map stack (MapLibre) is most of the bundle; Home renders without it.
 const Room = lazy(() => import("./Room"));
@@ -84,15 +84,16 @@ function Home({ initialCode, name, onEnter }: { initialCode: string; name: strin
         SeekHunt
       </div>
 
-      <ZoneRings />
+      <Hero />
 
+      <section className="home-panel">
       <div className="hero-copy">
         <h1 className="display">
           Escóndete.
           <br />
           La zona se cierra.
         </h1>
-        <p>Escondite por GPS para jugar con amigos en tu barrio. Un cazador, una zona que encoge cada pocos minutos y un único superviviente.</p>
+        <p>Escondite por GPS en tu barrio. Un cazador, una zona que encoge cada pocos minutos y un único superviviente.</p>
       </div>
 
       <form
@@ -120,24 +121,8 @@ function Home({ initialCode, name, onEnter }: { initialCode: string; name: strin
         {error && <Notice tone="danger">{error}</Notice>}
       </form>
 
-      <ol className="steps">
-        <li>
-          <span>
-            <b>Marca la zona</b> en el mapa y comparte el código con tu grupo.
-          </span>
-        </li>
-        <li>
-          <span>
-            <b>Escondeos</b> mientras el cazador espera en la salida.
-          </span>
-        </li>
-        <li>
-          <span>
-            <b>Sobrevive</b> a cada cierre. Si sales de la zona, el cazador te ve.
-          </span>
-        </li>
-      </ol>
-      <p className="fineprint">Elegid zonas peatonales. Nada de cruzar carreteras corriendo ni entrar en propiedades privadas.</p>
+      <p className="fineprint">Jugad a pie y en zonas peatonales. Nada de cruzar carreteras corriendo ni entrar en propiedades privadas.</p>
+      </section>
     </main>
   );
 }
