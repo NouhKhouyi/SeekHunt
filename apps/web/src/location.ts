@@ -5,7 +5,19 @@ export interface MyFix extends LatLng {
   acc: number;
   /** m/s as reported by the device, when it knows. */
   speed?: number;
+  /** Altitude and its accuracy (m). Many phones report none indoors; the server only trusts ±10 m or better. */
+  alt?: number;
+  altAcc?: number;
 }
+
+const toFix = (c: GeolocationCoordinates): MyFix => ({
+  lat: c.latitude,
+  lng: c.longitude,
+  acc: c.accuracy,
+  speed: c.speed ?? undefined,
+  alt: c.altitude ?? undefined,
+  altAcc: c.altitudeAccuracy ?? undefined,
+});
 
 /** 25 km/h: faster than running, so the player is on wheels. Same rule the server enforces on catches. */
 export const WALKING_LIMIT = WALKING_SPEED_LIMIT;
@@ -14,12 +26,13 @@ export const SIM_MODE = new URLSearchParams(location.search).has("sim");
 
 /** Browsers only expose GPS on https:// (or localhost). Opening the dev server by LAN IP silently fails. */
 export const GPS_NEEDS_HTTPS = !window.isSecureContext;
-const HTTPS_MESSAGE = "El GPS solo funciona en páginas https. Abre la app desde su enlace seguro (en desarrollo: npm run dev:phone).";
+/** Errors are message keys (see i18n.ts), translated where they are shown. */
+const HTTPS_MESSAGE = "gps.https";
 
 function describe(e: GeolocationPositionError): string {
-  if (e.code === e.PERMISSION_DENIED) return "Permiso de ubicación denegado. Actívalo en los ajustes del navegador para esta web.";
-  if (e.code === e.TIMEOUT) return "No encontramos señal GPS. Sal a cielo abierto y vuelve a intentarlo.";
-  return "Ubicación no disponible en este momento.";
+  if (e.code === e.PERMISSION_DENIED) return "gps.denied";
+  if (e.code === e.TIMEOUT) return "gps.timeout";
+  return "gps.unavailable";
 }
 
 /**
@@ -33,11 +46,11 @@ export function useMyLocation(enabled: boolean) {
   useEffect(() => {
     if (!enabled || SIM_MODE) return;
     if (GPS_NEEDS_HTTPS) return setError(HTTPS_MESSAGE);
-    if (!("geolocation" in navigator)) return setError("Este navegador no ofrece ubicación.");
+    if (!("geolocation" in navigator)) return setError("gps.unsupported");
     const id = navigator.geolocation.watchPosition(
       (p) => {
         setError(null);
-        setFix({ lat: p.coords.latitude, lng: p.coords.longitude, acc: p.coords.accuracy, speed: p.coords.speed ?? undefined });
+        setFix(toFix(p.coords));
       },
       (e) => setError(describe(e)),
       { enableHighAccuracy: true, maximumAge: 3000, timeout: 20_000 },
@@ -52,7 +65,7 @@ export function useMyLocation(enabled: boolean) {
     return new Promise((resolve, reject) =>
       navigator.geolocation.getCurrentPosition(
         (p) => {
-          const f = { lat: p.coords.latitude, lng: p.coords.longitude, acc: p.coords.accuracy };
+          const f = toFix(p.coords);
           setFix(f);
           setError(null);
           resolve(f);

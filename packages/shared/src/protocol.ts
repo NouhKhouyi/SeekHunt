@@ -10,6 +10,18 @@ export interface Fix extends LatLng {
   acc: number;
   /** Server receive time (ms epoch). */
   ts: number;
+  /** Altitude (m) and its accuracy, when the device reports them. Often missing indoors. */
+  alt?: number;
+  altAcc?: number;
+}
+
+/**
+ * Everything the server says to people is a message key plus parameters, translated on each phone.
+ * Keys are listed in apps/web/src/i18n.ts.
+ */
+export interface Msg {
+  key: string;
+  params?: Record<string, string | number>;
 }
 
 export interface PlayerView {
@@ -25,6 +37,8 @@ export interface PlayerView {
   outOfZoneSince?: number | null;
   /** Player asked for help: everybody sees them. */
   sos?: boolean;
+  /** Declared floor (building mode), shown alongside a visible position. */
+  floor?: number | null;
 }
 
 export interface Ping {
@@ -32,6 +46,10 @@ export interface Ping {
   /** Fuzzy circle that contains the true position. */
   area: Circle;
   at: number;
+  /** Building mode: the floor the player declared when the radar fired. */
+  floor?: number | null;
+  /** Altitude (m) at ping time, only when the device measured it to within 10 m. */
+  alt?: number;
 }
 
 export interface GameView {
@@ -44,8 +62,9 @@ export interface GameView {
   seekStartAt: number | null;
   endedAt: number | null;
   winners: string[];
-  winReason: string | null;
-  me: { id: string; role: Role; status: PlayerStatus; catchCode: string | null };
+  /** Rooms saved before i18n may still hold a plain Spanish string. */
+  winReason: Msg | string | null;
+  me: { id: string; role: Role; status: PlayerStatus; catchCode: string | null; floor: number | null };
   players: PlayerView[];
   pings: Ping[];
   nextPingAt: number | null;
@@ -58,7 +77,8 @@ export type ClientMsg =
   | { t: "setRole"; playerId: string; role: Role }
   | { t: "kick"; playerId: string }
   | { t: "start" }
-  | { t: "loc"; lat: number; lng: number; acc: number }
+  | { t: "loc"; lat: number; lng: number; acc: number; alt?: number | null; altAcc?: number | null }
+  | { t: "floor"; floor: number | null }
   | { t: "catch"; code: string }
   | { t: "surrender" }
   | { t: "sos" }
@@ -70,7 +90,7 @@ export type EventKind = "info" | "zone" | "ping" | "catch" | "elim" | "warn" | "
 
 export interface GameEvent {
   kind: EventKind;
-  text: string;
+  msg: Msg;
   /** Restrict delivery to these players; undefined means everybody. */
   to?: string[];
 }
@@ -78,4 +98,4 @@ export interface GameEvent {
 export type ServerMsg =
   | { t: "state"; view: GameView }
   | { t: "event"; event: Omit<GameEvent, "to">; at: number }
-  | { t: "error"; message: string };
+  | { t: "error"; error: Msg };

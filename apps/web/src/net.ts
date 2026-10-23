@@ -1,4 +1,4 @@
-import type { ClientMsg, GameEvent, GameView, ServerMsg } from "@seekhunt/shared";
+import type { ClientMsg, GameEvent, GameView, Msg, ServerMsg } from "@seekhunt/shared";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { cue } from "./sfx";
 
@@ -49,7 +49,7 @@ export const saveName = (name: string) => safeSet("seekhunt:name", name);
 export async function createRoom(): Promise<string> {
   const res = await fetch("/api/rooms", { method: "POST" });
   const body = (await res.json()) as { code?: string; error?: string };
-  if (!res.ok || !body.code) throw new Error(body.error ?? "No se pudo crear la sala");
+  if (!res.ok || !body.code) throw new Error(body.error?.startsWith("err.") ? body.error : "err.createFailed");
   return body.code;
 }
 
@@ -64,7 +64,8 @@ export type Toast = Omit<GameEvent, "to"> & { id: number };
 export interface Connection {
   view: GameView | null;
   status: "connecting" | "open" | "closed";
-  error: string | null;
+  /** Last server error, as a message key; translated where it is shown. */
+  error: Msg | null;
   toasts: Toast[];
   /** Server clock minus local clock, in ms. */
   clockOffset: number;
@@ -76,7 +77,7 @@ export interface Connection {
 export function useRoom(code: string, name: string): Connection {
   const [view, setView] = useState<GameView | null>(null);
   const [status, setStatus] = useState<Connection["status"]>("connecting");
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<Msg | null>(null);
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [clockOffset, setClockOffset] = useState(0);
   const wsRef = useRef<WebSocket | null>(null);
@@ -104,7 +105,7 @@ export function useRoom(code: string, name: string): Connection {
           setView(msg.view);
           setClockOffset(msg.view.serverNow - Date.now());
         } else if (msg.t === "error") {
-          setError(msg.message);
+          setError(msg.error);
         } else if (msg.t === "event") {
           const id = ++toastId.current;
           setToasts((t) => [...t.slice(-3), { ...msg.event, id }]);

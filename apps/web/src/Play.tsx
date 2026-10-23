@@ -1,9 +1,10 @@
-import { buildSchedule, type ClientMsg, distance, gameDeadline, type GameView, zoneAt } from "@seekhunt/shared";
-import { Focus, LifeBuoy, LocateFixed, Radar, ScanLine, Trophy, Users } from "lucide-react";
+import { buildSchedule, type ClientMsg, distance, gameDeadline, type GameView, MAX_FLOOR, MIN_FLOOR, type Ping, TRUSTED_ALTITUDE_ACCURACY, zoneAt } from "@seekhunt/shared";
+import { Building2, Focus, LifeBuoy, LocateFixed, Minus, Plus, Radar, ScanLine, Trophy, Users } from "lucide-react";
 import { useCallback, useMemo, useRef, useState } from "react";
 import { CatchQr, QrFullscreen, Scanner } from "./Catch";
 import { GameMap, type MapHandle, type MapPing, type MapPlayer } from "./GameMap";
-import { SIM_MODE, WALKING_LIMIT } from "./location";
+import { useT } from "./i18n";
+import { type MyFix, SIM_MODE, WALKING_LIMIT } from "./location";
 import type { Gps } from "./Room";
 import { type ConfirmRequest, fmt, GameProgress, initials, Notice, useNow } from "./ui";
 
@@ -17,7 +18,24 @@ interface Props {
 
 const MAP_PADDING = { top: 170, bottom: 220, left: 30, right: 30 };
 
+type T = ReturnType<typeof useT>;
+
+export function floorLabel(t: T, floor: number | null | undefined) {
+  if (floor === null || floor === undefined) return t("floor.unset");
+  if (floor === 0) return t("floor.ground");
+  return floor < 0 ? t("floor.basement", { n: -floor }) : t("floor.n", { n: floor });
+}
+
+/** Height difference to the viewer, only when both phones measured altitude well enough to mean something. */
+function altitudeHint(t: T, ping: Ping, me: MyFix | null) {
+  if (ping.alt === undefined || me?.alt === undefined || (me.altAcc ?? Infinity) > TRUSTED_ALTITUDE_ACCURACY) return null;
+  const d = Math.round(ping.alt - me.alt);
+  if (Math.abs(d) < 3) return t("alt.same");
+  return d > 0 ? t("alt.up", { m: d }) : t("alt.down", { m: -d });
+}
+
 export function Play({ view, send, gps, clockOffset, ask }: Props) {
+  const t = useT();
   const now = useNow(clockOffset);
   const mapRef = useRef<MapHandle>(null);
   const { config, me, phase } = view;
@@ -25,6 +43,7 @@ export function Play({ view, send, gps, clockOffset, ask }: Props) {
   const isHost = me.id === view.hostId;
   const ended = phase === "ended";
   const spectating = ended || me.status !== "active";
+  const building = !!config.buildingMode;
 
   const schedule = useMemo(
     () => (view.seekStartAt !== null ? buildSchedule(config, view.seed, view.seekStartAt) : null),
@@ -40,7 +59,7 @@ export function Play({ view, send, gps, clockOffset, ask }: Props) {
   const outside = !spectating && me.role === "hider" && outSince !== null;
   const fromCenter = fix ? distance(fix, current.center) : 0;
   // Local early warning before the server confirms (it checks every few seconds, with GPS slack).
-  const edgeWarning = spectating || me.role !== "hider" || outside || !fix ? null : fromCenter > current.radius ? "Estás saliendo de la zona. Vuelve dentro." : fromCenter > current.radius - 25 ? "Estás en el borde de la zona." : null;
+  const edgeWarning = spectating || me.role !== "hider" || outside || !fix ? null : fromCenter > current.radius ? t("play.edgeOut") : fromCenter > current.radius - 25 ? t("play.edge") : null;
 
   const players: MapPlayer[] = view.players
     .filter((p) => p.loc && p.id !== me.id)
@@ -50,37 +69,38 @@ export function Play({ view, send, gps, clockOffset, ask }: Props) {
       pos: p.loc!,
       kind: p.sos ? "sos" : p.role === "seeker" ? "seeker" : p.visibleBecause === "outOfZone" || p.visibleBecause === "stale" ? "revealed" : "hider",
     }));
-  if (fix) players.push({ id: me.id, name: "Tú", pos: fix, kind: "me" });
+  if (fix) players.push({ id: me.id, name: t("common.you"), pos: fix, kind: "me" });
   const mySos = !!view.players.find((p) => p.id === me.id)?.sos;
   const othersSos = view.players.filter((p) => p.sos && p.id !== me.id);
   const fast = (fix?.speed ?? 0) > WALKING_LIMIT;
 
   const byId = new Map(view.players.map((p) => [p.id, p]));
-  const pings: MapPing[] = view.pings.map((p) => ({ area: p.area, label: byId.get(p.playerId)?.name ?? "", kind: byId.get(p.playerId)?.role ?? "hider" }));
+  const pingText = (p: Ping) => [byId.get(p.playerId)?.name ?? "", building ? floorLabel(t, p.floor) : null, altitudeHint(t, p, fix)].filter(Boolean).join(", ");
+  const pings: MapPing[] = view.pings.map((p) => ({ area: p.area, label: pingText(p), kind: byId.get(p.playerId)?.role ?? "hider" }));
 
   let headline: string;
   let clock: string | null = null;
   if (phase === "hiding") {
-    headline = me.role === "seeker" ? "Salida del cazador" : "Tiempo para esconderte";
+    headline = me.role === "seeker" ? t("head.seekerWait") : t("head.hide");
     clock = fmt(view.seekStartAt! - now);
   } else if (phase === "seeking" && zone) {
-    if (zone.shrinking) headline = `Cerrando zona ${zone.index} de ${config.shrinkCount}`;
+    if (zone.shrinking) headline = t("head.closing", { i: zone.index, n: config.shrinkCount });
     else if (zone.nextShrinkAt) {
-      headline = zone.index === 0 ? "Primer cierre" : `Cierre ${zone.index + 1} de ${config.shrinkCount}`;
+      headline = zone.index === 0 ? t("head.first") : t("head.next", { i: zone.index + 1, n: config.shrinkCount });
       clock = fmt(zone.nextShrinkAt - now);
     } else {
-      headline = "Zona final";
+      headline = t("head.final");
       clock = deadline ? fmt(deadline - now) : null;
     }
   } else {
-    headline = "Partida terminada";
+    headline = t("head.ended");
   }
   if (outside) {
-    headline = "Fuera de la zona";
+    headline = t("head.outside");
     clock = fmt(outSince! + config.outOfZoneGraceSeconds * 1000 - now);
   }
 
-  const roleLabel = me.role === "seeker" ? "Cazador" : me.status === "active" ? "Escondido" : me.status === "caught" ? "Pillado" : "Eliminado";
+  const roleLabel = me.role === "seeker" ? t("role.seeker") : me.status === "active" ? t("role.hider") : me.status === "caught" ? t("status.caught") : t("status.eliminated");
 
   return (
     <main className="play">
@@ -111,15 +131,20 @@ export function Play({ view, send, gps, clockOffset, ask }: Props) {
         {!outside && <GameProgress config={config} elapsed={elapsed} />}
         {outside ? (
           // While the clock counts down to elimination, the only thing that matters is getting back in.
-          <div className="hud-meta">Vuelve dentro del círculo o quedarás eliminado.</div>
+          <div className="hud-meta">{t("hud.outsideMeta")}</div>
         ) : (
           <div className="hud-meta">
             <span>
-              <Users size={14} /> <span className="num">{alive}</span> en juego
+              <Users size={14} /> <span className="num">{alive}</span> {t("hud.inPlay")}
             </span>
             {view.nextPingAt && phase === "seeking" && (
               <span>
-                <Radar size={14} /> Radar en <span className="num">{fmt(view.nextPingAt - now)}</span>
+                <Radar size={14} /> {t("hud.radarIn")} <span className="num">{fmt(view.nextPingAt - now)}</span>
+              </span>
+            )}
+            {building && !spectating && (
+              <span>
+                <Building2 size={14} /> {floorLabel(t, me.floor)}
               </span>
             )}
           </div>
@@ -127,17 +152,17 @@ export function Play({ view, send, gps, clockOffset, ask }: Props) {
       </header>
 
       <div className="side-fab">
-        <button className="icon-btn" aria-label="Centrar en mi posición" disabled={!fix} onClick={() => fix && mapRef.current?.flyTo(fix)}>
+        <button className="icon-btn" aria-label={t("fab.me")} disabled={!fix} onClick={() => fix && mapRef.current?.flyTo(fix)}>
           <LocateFixed size={20} />
         </button>
-        <button className="icon-btn" aria-label="Ver toda la zona" onClick={() => mapRef.current?.fit(current)}>
+        <button className="icon-btn" aria-label={t("fab.zone")} onClick={() => mapRef.current?.fit(current)}>
           <Focus size={20} />
         </button>
         {!ended && !mySos && (
           <button
             className="icon-btn sos"
-            aria-label="Pedir ayuda (SOS)"
-            onClick={() => ask({ title: "¿Pedir ayuda?", body: "Todos los jugadores verán tu posición exacta y recibirán un aviso. Úsalo si te has hecho daño o te sientes en peligro. Si es una emergencia, llama al\u00a0112.", confirm: "Enviar SOS", danger: true, onConfirm: () => send({ t: "sos" }) })}
+            aria-label={t("fab.sos")}
+            onClick={() => ask({ title: t("sos.title"), body: t("sos.body"), confirm: t("sos.confirm"), danger: true, onConfirm: () => send({ t: "sos" }) })}
           >
             <LifeBuoy size={20} />
           </button>
@@ -145,7 +170,7 @@ export function Play({ view, send, gps, clockOffset, ask }: Props) {
       </div>
       {SIM_MODE && !spectating && (
         <div className="sim-chip">
-          <span className="pill">Simulación: toca el mapa para moverte</span>
+          <span className="pill">{t("sim.chip")}</span>
         </div>
       )}
 
@@ -156,11 +181,11 @@ export function Play({ view, send, gps, clockOffset, ask }: Props) {
             tone="danger"
             action={
               <button className="notice-action" onClick={() => send({ t: "sosClear" })}>
-                Estoy bien
+                {t("sos.ok")}
               </button>
             }
           >
-            Has pedido ayuda. Todos ven tu posición.
+            {t("sos.mine")}
           </Notice>
         )}
         {othersSos.map((p) => (
@@ -170,12 +195,12 @@ export function Play({ view, send, gps, clockOffset, ask }: Props) {
             action={
               p.loc && (
                 <button className="notice-action" onClick={() => mapRef.current?.flyTo(p.loc!)}>
-                  Ver
+                  {t("common.view")}
                 </button>
               )
             }
           >
-            {p.name} necesita ayuda.
+            {t("sos.other", { name: p.name })}
           </Notice>
         ))}
         {me.role === "seeker" &&
@@ -188,16 +213,19 @@ export function Play({ view, send, gps, clockOffset, ask }: Props) {
                 tone="warn"
                 action={
                   <button className="notice-action" onClick={() => mapRef.current?.flyTo(p.loc!)}>
-                    Ver
+                    {t("common.view")}
                   </button>
                 }
               >
-                {p.visibleBecause === "outOfZone" ? `${p.name} está fuera de la zona.` : `${p.name} ha perdido la señal. Ves su última posición.`}
+                {p.visibleBecause === "outOfZone" ? t("seen.outOfZone", { name: p.name }) : t("seen.stale", { name: p.name })}
+                {building && ` ${floorLabel(t, p.floor)}.`}
               </Notice>
             ))}
-        {gps.error && !SIM_MODE && <Notice tone="warn">{gps.error}</Notice>}
-        {fast && !spectating && <Notice tone="warn">Vas a más de 25&nbsp;km/h. En SeekHunt se juega a pie: nada de bici, patinete ni coche.</Notice>}
+        {gps.error && !SIM_MODE && <Notice tone="warn">{t.msg({ key: gps.error })}</Notice>}
+        {fast && !spectating && <Notice tone="warn">{t("play.fast")}</Notice>}
         {edgeWarning && <Notice tone="warn">{edgeWarning}</Notice>}
+        {building && view.pings.length > 0 && !ended && <RadarList pings={view.pings} label={pingText} onShow={(p) => mapRef.current?.fit(p.area)} />}
+        {building && !spectating && <FloorPicker floor={me.floor} onChange={(floor) => send({ t: "floor", floor })} />}
         {ended ? (
           <Results view={view} isHost={isHost} send={send} />
         ) : me.role === "seeker" ? (
@@ -207,12 +235,12 @@ export function Play({ view, send, gps, clockOffset, ask }: Props) {
         )}
         {isHost && !ended && (
           <div className="sheet-foot">
-            <span className="faint small">{phase === "hiding" ? "Mantén la pantalla encendida durante la partida" : "Eres el anfitrión"}</span>
+            <span className="faint small">{phase === "hiding" ? t("host.keepScreen") : t("host.you")}</span>
             <button
               className="btn btn-text danger btn-sm"
-              onClick={() => ask({ title: "¿Terminar la partida?", body: "Se acabará para todos los jugadores y nadie ganará.", confirm: "Terminar partida", danger: true, onConfirm: () => send({ t: "end" }) })}
+              onClick={() => ask({ title: t("end.title"), body: t("end.body"), confirm: t("end.confirm"), danger: true, onConfirm: () => send({ t: "end" }) })}
             >
-              Terminar
+              {t("host.end")}
             </button>
           </div>
         )}
@@ -221,7 +249,53 @@ export function Play({ view, send, gps, clockOffset, ask }: Props) {
   );
 }
 
+/** Building mode: everyone says which floor they are on; the radar repeats it. */
+function FloorPicker({ floor, onChange }: { floor: number | null; onChange: (f: number | null) => void }) {
+  const t = useT();
+  const base = floor ?? 0;
+  return (
+    <div className="floor">
+      <div className="floor-text">
+        <span className="label">{t("floor.label")}</span>
+        <b>{floorLabel(t, floor)}</b>
+        {/* The reminder matters until the floor is set; after that it only costs map space. */}
+        {floor === null && <span className="faint small">{t("floor.honor")}</span>}
+      </div>
+      <div className="stepper">
+        <button className="icon-btn plain" aria-label={t("floor.down")} disabled={floor !== null && floor <= MIN_FLOOR} onClick={() => onChange(floor === null ? 0 : base - 1)}>
+          <Minus size={18} />
+        </button>
+        <span className="num" aria-live="polite">
+          {floor === null ? "–" : floor}
+        </span>
+        <button className="icon-btn plain" aria-label={t("floor.up")} disabled={floor !== null && floor >= MAX_FLOOR} onClick={() => onChange(floor === null ? 0 : base + 1)}>
+          <Plus size={18} />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/** The last radar as a readable list: in a building, the floor matters more than the dot on the map. */
+function RadarList({ pings, label, onShow }: { pings: Ping[]; label: (p: Ping) => string; onShow: (p: Ping) => void }) {
+  const t = useT();
+  return (
+    <ul className="radar-list" aria-label={t("set.pingIntervalSeconds")}>
+      {pings.map((p) => (
+        <li key={p.playerId}>
+          <Radar size={14} />
+          <span>{label(p)}</span>
+          <button className="notice-action" onClick={() => onShow(p)}>
+            {t("common.view")}
+          </button>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 function SeekerSheet({ view, send, fast }: { view: GameView; send: (m: ClientMsg) => void; fast: boolean }) {
+  const t = useT();
   const [scanning, setScanning] = useState(false);
   const onCode = useCallback(
     (code: string) => {
@@ -233,48 +307,51 @@ function SeekerSheet({ view, send, fast }: { view: GameView; send: (m: ClientMsg
   if (view.phase === "hiding") {
     return (
       <div className="result">
-        <span className="label">Quédate en la salida</span>
-        <p className="muted">Los escondidos están buscando sitio. Cuando el reloj llegue a cero, empieza la caza.</p>
+        <span className="label">{t("seeker.waitTitle")}</span>
+        <p className="muted">{t("seeker.waitBody")}</p>
       </div>
     );
   }
   return (
     <div className="result">
-      <span className="label">¿Has tocado a alguien?</span>
+      <span className="label">{t("seeker.touched")}</span>
       <button className="btn btn-blaze btn-block" onClick={() => setScanning(true)} disabled={fast}>
-        <ScanLine size={20} /> Escanear su QR para pillar
+        <ScanLine size={20} /> {t("seeker.scan")}
       </button>
-      <p className="faint small">{fast ? "Vas demasiado rápido. Solo se puede pillar a pie." : "Escanea el QR de su pantalla o escribe sus 4 cifras. Tenéis que estar juntos."}</p>
+      <p className="faint small">{fast ? t("seeker.fast") : t("seeker.howto")}</p>
       {scanning && <Scanner room={view.code} onCode={onCode} onClose={() => setScanning(false)} />}
     </div>
   );
 }
 
 function HiderSheet({ view, send, ask }: { view: GameView; send: (m: ClientMsg) => void; ask: (r: ConfirmRequest) => void }) {
+  const t = useT();
   const [full, setFull] = useState(false);
   if (view.me.status !== "active") {
     return (
       <div className="result">
-        <span className="label">{view.me.status === "caught" ? "Te han pillado" : "Eliminado por salir de la zona"}</span>
-        <p className="muted">Sigue la partida desde aquí: ahora ves a todos los jugadores.</p>
+        <span className="label">{view.me.status === "caught" ? t("hider.caught") : t("hider.eliminated")}</span>
+        <p className="muted">{t("hider.spectate")}</p>
       </div>
     );
   }
   const code = view.me.catchCode!;
   return (
     <div className="hider-sheet">
-      <button className="qr-button" onClick={() => setFull(true)} aria-label="Ampliar código QR">
+      <button className="qr-button" onClick={() => setFull(true)} aria-label={t("hider.enlargeQr")}>
         <CatchQr room={view.code} code={code} size={104} />
       </button>
       <div className="result">
-        <span className="label">Si te pillan</span>
-        <div className="capture-code num" translate="no">{code}</div>
+        <span className="label">{t("hider.ifCaught")}</span>
+        <div className="capture-code num" translate="no">
+          {code}
+        </div>
         <button
           className="btn btn-text btn-sm"
           style={{ alignSelf: "flex-start", padding: 0 }}
-          onClick={() => ask({ title: "¿Te han pillado?", body: "Quedarás fuera de la partida. Úsalo solo si el cazador no puede escanear tu QR.", confirm: "Sí, me han pillado", danger: true, onConfirm: () => send({ t: "surrender" }) })}
+          onClick={() => ask({ title: t("surrender.title"), body: t("surrender.body"), confirm: t("surrender.confirm"), danger: true, onConfirm: () => send({ t: "surrender" }) })}
         >
-          Me han pillado
+          {t("hider.surrender")}
         </button>
       </div>
       {full && <QrFullscreen room={view.code} code={code} onClose={() => setFull(false)} />}
@@ -282,9 +359,10 @@ function HiderSheet({ view, send, ask }: { view: GameView; send: (m: ClientMsg) 
   );
 }
 
-const STATUS_LABEL = { active: "En juego", caught: "Pillado", eliminated: "Eliminado" };
+const STATUS_KEY = { active: "status.active", caught: "status.caught", eliminated: "status.eliminated" } as const;
 
 function Results({ view, isHost, send }: { view: GameView; isHost: boolean; send: (m: ClientMsg) => void }) {
+  const t = useT();
   const winners = new Set(view.winners);
   const iWon = winners.has(view.me.id);
   const names = view.players.filter((p) => winners.has(p.id)).map((p) => p.name);
@@ -293,24 +371,24 @@ function Results({ view, isHost, send }: { view: GameView; isHost: boolean; send
     <div className="result">
       <h2 className="display row" style={{ gap: 10 }}>
         {iWon && <Trophy size={30} strokeWidth={2.5} aria-hidden />}
-        {iWon ? "Has ganado" : names.length ? `Gana ${names.join(", ")}` : "Sin ganador"}
+        {iWon ? t("results.won") : names.length ? t("results.winner", { names: names.join(", ") }) : t("results.none")}
       </h2>
-      <p className="muted">{view.winReason}</p>
+      <p className="muted">{t.msg(view.winReason)}</p>
       <ul className="standings">
         {sorted.map((p) => (
           <li key={p.id}>
             <span className={`avatar ${p.role}`}>{initials(p.name)}</span>
             <span className="who">{p.name}</span>
-            <span className={`badge${winners.has(p.id) ? " win" : ""}`}>{winners.has(p.id) ? "Gana" : p.role === "seeker" ? "Cazador" : STATUS_LABEL[p.status]}</span>
+            <span className={`badge${winners.has(p.id) ? " win" : ""}`}>{winners.has(p.id) ? t("results.badgeWin") : p.role === "seeker" ? t("role.seeker") : t(STATUS_KEY[p.status])}</span>
           </li>
         ))}
       </ul>
       {isHost ? (
         <button className="btn btn-block" style={{ marginTop: 8 }} onClick={() => send({ t: "reset" })}>
-          Jugar otra vez
+          {t("results.again")}
         </button>
       ) : (
-        <p className="faint small">El anfitrión puede empezar otra ronda.</p>
+        <p className="faint small">{t("results.waitHost")}</p>
       )}
     </div>
   );

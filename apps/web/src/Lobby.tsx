@@ -2,9 +2,10 @@ import { type ClientMsg, DEFAULT_CONFIG, distance, effectiveFinalRadius, type Ga
 import { Check, ChevronDown, ChevronLeft, LocateFixed, Share2, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { GameMap, type MapHandle, type MapPlayer } from "./GameMap";
+import { type Key, locale, useT } from "./i18n";
 import { SIM_MODE } from "./location";
 import type { Gps } from "./Room";
-import { gamePlan, initials, Notice, Segmented, Switch, ZoneSchedule } from "./ui";
+import { gamePlan, initials, LangToggle, Notice, Segmented, Switch, ZoneSchedule } from "./ui";
 
 interface Props {
   view: GameView;
@@ -15,32 +16,33 @@ interface Props {
 
 const MIN = 60;
 type Timing = Pick<GameConfig, "hideSeconds" | "shrinkCount" | "shrinkIntervalSeconds" | "shrinkDurationSeconds" | "finalRadius" | "finalHoldSeconds" | "pingIntervalSeconds">;
-const PRESETS: { id: string; label: string; timing: Timing }[] = [
-  { id: "quick", label: "Rápida", timing: { hideSeconds: 3 * MIN, shrinkCount: 4, shrinkIntervalSeconds: 3 * MIN, shrinkDurationSeconds: 30, finalRadius: 40, finalHoldSeconds: 3 * MIN, pingIntervalSeconds: 2 * MIN } },
-  { id: "classic", label: "Clásica", timing: { hideSeconds: 5 * MIN, shrinkCount: 5, shrinkIntervalSeconds: 5 * MIN, shrinkDurationSeconds: MIN, finalRadius: 60, finalHoldSeconds: 5 * MIN, pingIntervalSeconds: 3 * MIN } },
-  { id: "long", label: "Larga", timing: { hideSeconds: 10 * MIN, shrinkCount: 6, shrinkIntervalSeconds: 8 * MIN, shrinkDurationSeconds: 2 * MIN, finalRadius: 100, finalHoldSeconds: 10 * MIN, pingIntervalSeconds: 5 * MIN } },
+const PRESETS: { id: "quick" | "classic" | "long"; timing: Timing }[] = [
+  { id: "quick", timing: { hideSeconds: 3 * MIN, shrinkCount: 4, shrinkIntervalSeconds: 3 * MIN, shrinkDurationSeconds: 30, finalRadius: 40, finalHoldSeconds: 3 * MIN, pingIntervalSeconds: 2 * MIN } },
+  { id: "classic", timing: { hideSeconds: 5 * MIN, shrinkCount: 5, shrinkIntervalSeconds: 5 * MIN, shrinkDurationSeconds: MIN, finalRadius: 60, finalHoldSeconds: 5 * MIN, pingIntervalSeconds: 3 * MIN } },
+  { id: "long", timing: { hideSeconds: 10 * MIN, shrinkCount: 6, shrinkIntervalSeconds: 8 * MIN, shrinkDurationSeconds: 2 * MIN, finalRadius: 100, finalHoldSeconds: 10 * MIN, pingIntervalSeconds: 5 * MIN } },
 ];
 
 type NumKey = { [K in keyof GameConfig]: GameConfig[K] extends number ? K : never }[keyof GameConfig];
-const ADVANCED: { key: NumKey; label: string; hint?: string; values: [number, string][] }[] = [
-  { key: "hideSeconds", label: "Tiempo para esconderse", values: [[MIN, "1 min"], [3 * MIN, "3 min"], [5 * MIN, "5 min"], [10 * MIN, "10 min"], [15 * MIN, "15 min"]] },
-  { key: "shrinkCount", label: "Número de cierres", values: [[3, "3"], [4, "4"], [5, "5"], [6, "6"], [8, "8"]] },
-  { key: "shrinkIntervalSeconds", label: "Tiempo entre cierres", values: [[2 * MIN, "2 min"], [3 * MIN, "3 min"], [5 * MIN, "5 min"], [8 * MIN, "8 min"], [10 * MIN, "10 min"]] },
-  { key: "shrinkDurationSeconds", label: "Duración de cada cierre", values: [[0, "Instantáneo"], [30, "30 s"], [MIN, "1 min"], [2 * MIN, "2 min"]] },
-  { key: "finalRadius", label: "Radio de la zona final", values: [[10, "10 m"], [20, "20 m"], [30, "30 m"], [40, "40 m"], [60, "60 m"], [100, "100 m"], [200, "200 m"]] },
-  { key: "finalHoldSeconds", label: "Tiempo en la zona final", values: [[0, "Ninguno"], [3 * MIN, "3 min"], [5 * MIN, "5 min"], [10 * MIN, "10 min"]] },
-  { key: "outOfZoneGraceSeconds", label: "Margen fuera de la zona", hint: "Después, eliminado", values: [[15, "15 s"], [30, "30 s"], [45, "45 s"], [90, "90 s"]] },
-  { key: "pingIntervalSeconds", label: "Radar", hint: "Revela posiciones aproximadas", values: [[0, "Desactivado"], [2 * MIN, "Cada 2 min"], [3 * MIN, "Cada 3 min"], [5 * MIN, "Cada 5 min"]] },
-  { key: "pingFuzzMeters", label: "Precisión del radar", values: [[30, "± 30 m"], [80, "± 80 m"], [150, "± 150 m"], [300, "± 300 m"]] },
+/** Option labels: plain text, or a message key with params so they follow the language. */
+type Label = string | [Key, Record<string, number>?];
+const mins = (n: number): Label => `${n} min`;
+const ADVANCED: { key: NumKey; hint?: Key; values: [number, Label][] }[] = [
+  { key: "hideSeconds", values: [[MIN, mins(1)], [3 * MIN, mins(3)], [5 * MIN, mins(5)], [10 * MIN, mins(10)], [15 * MIN, mins(15)]] },
+  { key: "shrinkCount", values: [[3, "3"], [4, "4"], [5, "5"], [6, "6"], [8, "8"]] },
+  { key: "shrinkIntervalSeconds", values: [[2 * MIN, mins(2)], [3 * MIN, mins(3)], [5 * MIN, mins(5)], [8 * MIN, mins(8)], [10 * MIN, mins(10)]] },
+  { key: "shrinkDurationSeconds", values: [[0, ["opt.instant"]], [30, "30 s"], [MIN, mins(1)], [2 * MIN, mins(2)]] },
+  { key: "finalRadius", values: [[10, "10 m"], [20, "20 m"], [30, "30 m"], [40, "40 m"], [60, "60 m"], [100, "100 m"], [200, "200 m"]] },
+  { key: "finalHoldSeconds", values: [[0, ["opt.none"]], [3 * MIN, mins(3)], [5 * MIN, mins(5)], [10 * MIN, mins(10)]] },
+  { key: "outOfZoneGraceSeconds", hint: "set.outOfZoneGraceSeconds.hint", values: [[15, "15 s"], [30, "30 s"], [45, "45 s"], [90, "90 s"]] },
+  { key: "pingIntervalSeconds", hint: "set.pingIntervalSeconds.hint", values: [[0, ["opt.off"]], [MIN, ["opt.every", { n: 1 }]], [2 * MIN, ["opt.every", { n: 2 }]], [3 * MIN, ["opt.every", { n: 3 }]], [5 * MIN, ["opt.every", { n: 5 }]]] },
+  // 0 = exact: the circle is only the GPS error. Below ~10 m outdoors there is nothing left to gain.
+  { key: "pingFuzzMeters", hint: "set.pingFuzzMeters.hint", values: [[0, ["opt.exact"]], [10, "± 10 m"], [25, "± 25 m"], [50, "± 50 m"], [80, "± 80 m"], [150, "± 150 m"], [300, "± 300 m"]] },
 ];
 
 const fmtKm2 = (r: number) => (Math.PI * r * r) / 1e6;
-const NUM0 = new Intl.NumberFormat("es-ES", { maximumFractionDigits: 0 });
-const NUM1 = new Intl.NumberFormat("es-ES", { maximumFractionDigits: 1 });
-const NUM2 = new Intl.NumberFormat("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const fmt = (n: number, digits: number, min = 0) => n.toLocaleString(locale(), { maximumFractionDigits: digits, minimumFractionDigits: min });
 /** m² for a courtyard, hectares for a park, km² for a neighbourhood. */
-const fmtArea = (km2: number) =>
-  km2 < 0.01 ? `${NUM0.format(km2 * 1e6)} m²` : km2 < 1 ? `${NUM1.format(km2 * 100)} ha` : `${NUM2.format(km2)} km²`;
+const fmtArea = (km2: number) => (km2 < 0.01 ? `${fmt(km2 * 1e6, 0)} m²` : km2 < 1 ? `${fmt(km2 * 100, 1)} ha` : `${fmt(km2, 2, 2)} km²`);
 
 // The slider is logarithmic: a step near 30 m matters as much as one near 3 km.
 const SLIDER_MAX = 5000;
@@ -54,6 +56,7 @@ const QUICK_RADII = [50, 100, 250, 500, 1000];
 
 /** Exact metres, a quick pick, or the slider: all three edit the same radius. */
 function RadiusControl({ value, onPreview, onCommit }: { value: number; onPreview: (r: number) => void; onCommit: (r: number) => void }) {
+  const t = useT();
   const [text, setText] = useState<string | null>(null);
   const shown = text ?? String(Math.round(value));
   const commitText = () => {
@@ -68,7 +71,7 @@ function RadiusControl({ value, onPreview, onCommit }: { value: number; onPrevie
         <input
           id="radius-exact"
           inputMode="numeric"
-          aria-label="Radio de la zona en metros"
+          aria-label={t("lobby.radiusExact")}
           value={shown}
           style={{ width: `${Math.max(2, shown.length) + 0.3}ch` }}
           onChange={(e) => setText(e.target.value.replace(/[^\d]/g, "").slice(0, 5))}
@@ -76,9 +79,9 @@ function RadiusControl({ value, onPreview, onCommit }: { value: number; onPrevie
           onBlur={commitText}
           onKeyDown={(e) => e.key === "Enter" && (e.currentTarget as HTMLInputElement).blur()}
         />
-        <small>m de radio</small>
+        <small>{t("lobby.radiusUnit")}</small>
       </label>
-      <div className="chips" role="group" aria-label="Radios habituales">
+      <div className="chips" role="group" aria-label={t("lobby.radiusQuick")}>
         {QUICK_RADII.map((r) => (
           <button key={r} type="button" className="chip" aria-pressed={Math.round(value) === r} onClick={() => onCommit(r)}>
             {r >= 1000 ? `${r / 1000} km` : `${r} m`}
@@ -88,8 +91,8 @@ function RadiusControl({ value, onPreview, onCommit }: { value: number; onPrevie
       <input
         id="radius"
         type="range"
-        aria-label="Radio de la zona"
-        aria-valuetext={`${Math.round(value)} metros`}
+        aria-label={t("lobby.radiusSlider")}
+        aria-valuetext={t("lobby.radiusValue", { m: Math.round(value) })}
         min={0}
         max={1000}
         step={1}
@@ -103,6 +106,8 @@ function RadiusControl({ value, onPreview, onCommit }: { value: number; onPrevie
 }
 
 export function Lobby({ view, send, gps, onLeave }: Props) {
+  const t = useT();
+  const label = (l: Label) => (typeof l === "string" ? l : t(l[0], l[1]));
   const isHost = view.me.id === view.hostId;
   const cfg = view.config;
   const setConfig = (c: Partial<GameConfig>) => send({ t: "config", config: c });
@@ -122,7 +127,7 @@ export function Lobby({ view, send, gps, onLeave }: Props) {
   const share = async () => {
     const url = `${location.origin}${location.pathname}${SIM_MODE ? "?sim" : ""}#${view.code}`;
     try {
-      if (navigator.share) await navigator.share({ title: "SeekHunt", text: `Únete a mi partida de SeekHunt con el código ${view.code}`, url });
+      if (navigator.share) await navigator.share({ title: "SeekHunt", text: t("lobby.shareText", { code: view.code }), url });
       else {
         await navigator.clipboard.writeText(url);
         setCopied(true);
@@ -143,7 +148,7 @@ export function Lobby({ view, send, gps, onLeave }: Props) {
       if (isHost) mapRef.current?.fit({ center: fix, radius: cfg.zone.radius });
       else mapRef.current?.flyTo(fix);
     } catch (e) {
-      setLocError(e instanceof Error ? e.message : "No se pudo obtener tu ubicación.");
+      setLocError(e instanceof Error && e.message.startsWith("gps.") ? e.message : "gps.unavailable");
     } finally {
       setLocating(false);
     }
@@ -167,7 +172,9 @@ export function Lobby({ view, send, gps, onLeave }: Props) {
   const mapPlayers: MapPlayer[] = view.players
     .filter((p) => p.loc && p.id !== view.me.id)
     .map((p) => ({ id: p.id, name: p.name, pos: p.loc!, kind: p.role }));
-  if (gps.fix) mapPlayers.push({ id: view.me.id, name: "Tú", pos: gps.fix, kind: "me" });
+  if (gps.fix) mapPlayers.push({ id: view.me.id, name: t("common.you"), pos: gps.fix, kind: "me" });
+
+  const gpsProblem = locError ?? gps.error;
 
   return (
     <main className="lobby">
@@ -183,21 +190,23 @@ export function Lobby({ view, send, gps, onLeave }: Props) {
           onTap={isHost ? (p) => setConfig({ zone: { center: p, radius: cfg.zone.radius } }) : SIM_MODE ? gps.setSimFix : undefined}
         />
         <div className="map-top">
-          <button className="icon-btn" onClick={onLeave} aria-label="Salir de la sala">
+          <button className="icon-btn" onClick={onLeave} aria-label={t("lobby.leave")}>
             <ChevronLeft size={22} />
           </button>
-          <button className="room-chip" onClick={share} aria-label={`Compartir código ${view.code}`}>
-            <span className="num" translate="no">{view.code}</span>
+          <button className="room-chip" onClick={share} aria-label={t("lobby.share", { code: view.code })}>
+            <span className="num" translate="no">
+              {view.code}
+            </span>
             <span className="chip-icon">{copied ? <Check size={18} /> : <Share2 size={18} />}</span>
           </button>
         </div>
         {isHost && (
           <div className="map-hint">
-            <span className="pill">Toca el mapa para mover el centro</span>
+            <span className="pill">{t("lobby.tapHint")}</span>
           </div>
         )}
         <div className="map-fab">
-          <button className="icon-btn" onClick={locate} aria-label={isHost ? "Centrar la zona en mi ubicación" : "Ver mi ubicación"} disabled={locating}>
+          <button className="icon-btn" onClick={locate} aria-label={isHost ? t("lobby.centerOnMe") : t("lobby.showMe")} disabled={locating}>
             {locating ? <span className="spinner" /> : <LocateFixed size={20} />}
           </button>
         </div>
@@ -205,39 +214,40 @@ export function Lobby({ view, send, gps, onLeave }: Props) {
 
       <section className="panel">
         <div className="grabber" />
-        <header className="panel-head">
-          <h1 className="display">{isHost ? "Prepara la partida" : "Esperando al anfitrión"}</h1>
+        <header className="panel-head row spread">
+          <h1 className="display">{isHost ? t("lobby.titleHost") : t("lobby.titleGuest")}</h1>
+          <LangToggle />
         </header>
 
-        {(locError || gps.error) && (
+        {gpsProblem && (
           <div style={{ paddingBottom: 16 }}>
-            <Notice tone="warn">{locError ?? gps.error}</Notice>
+            <Notice tone="warn">{t.msg({ key: gpsProblem })}</Notice>
           </div>
         )}
-        {!locError && !gps.error && kmAway > 1 && !(isHost && zoneUntouched) && (
+        {!gpsProblem && kmAway > 1 && !(isHost && zoneUntouched) && (
           <div style={{ paddingBottom: 16 }}>
             <Notice
               tone="warn"
               action={
                 isHost ? (
                   <button className="notice-action" onClick={locate}>
-                    Mover aquí
+                    {t("lobby.moveHere")}
                   </button>
                 ) : (
                   <button className="notice-action" onClick={() => fix && mapRef.current?.flyTo(fix)}>
-                    Ver
+                    {t("common.view")}
                   </button>
                 )
               }
             >
-              Estás a {NUM0.format(kmAway)}&nbsp;km de la zona de juego.
+              {t("lobby.farAway", { km: fmt(kmAway, 0) })}
             </Notice>
           </div>
         )}
 
         <div className="block">
           <div className="block-head">
-            <h2>Zona de juego</h2>
+            <h2>{t("lobby.zone")}</h2>
             <span className="faint small num">{fmtArea(area)}</span>
           </div>
           {isHost ? (
@@ -245,17 +255,15 @@ export function Lobby({ view, send, gps, onLeave }: Props) {
           ) : (
             <div className="big-value num">
               {Math.round(shownRadius)}
-              <small>m de radio</small>
+              <small>{t("lobby.radiusUnit")}</small>
             </div>
           )}
         </div>
 
         <div className="block">
           <div className="block-head">
-            <h2>Jugadores</h2>
-            <span className="faint small">
-              {seekers} cazador{seekers === 1 ? "" : "es"} y {hiders} escondido{hiders === 1 ? "" : "s"}
-            </span>
+            <h2>{t("lobby.players")}</h2>
+            <span className="faint small">{t("lobby.counts", { s: seekers, h: hiders })}</span>
           </div>
           <ul className="players">
             {view.players.map((p) => (
@@ -264,33 +272,33 @@ export function Lobby({ view, send, gps, onLeave }: Props) {
                 <span className="who">
                   <b>
                     {p.name}
-                    {p.id === view.me.id && <span className="faint"> (tú)</span>}
+                    {p.id === view.me.id && <span className="faint">{t("lobby.youSuffix")}</span>}
                   </b>
                   <span>
                     <i className="dot-online" />
-                    {p.id === view.hostId ? "Anfitrión" : p.connected ? "Conectado" : "Desconectado"}
+                    {p.id === view.hostId ? t("lobby.host") : p.connected ? t("lobby.online") : t("lobby.offline")}
                   </span>
                 </span>
                 {isHost ? (
                   <>
                     <Segmented<Role>
                       small
-                      label={`Rol de ${p.name}`}
+                      label={t("lobby.roleOf", { name: p.name })}
                       value={p.role}
                       onChange={(role) => send({ t: "setRole", playerId: p.id, role })}
                       options={[
-                        { value: "seeker", label: "Caza" },
-                        { value: "hider", label: "Se esconde" },
+                        { value: "seeker", label: t("role.seekShort") },
+                        { value: "hider", label: t("role.hideShort") },
                       ]}
                     />
                     {p.id !== view.me.id && (
-                      <button className="icon-btn plain" aria-label={`Expulsar a ${p.name}`} onClick={() => send({ t: "kick", playerId: p.id })}>
+                      <button className="icon-btn plain" aria-label={t("lobby.kick", { name: p.name })} onClick={() => send({ t: "kick", playerId: p.id })}>
                         <X size={18} />
                       </button>
                     )}
                   </>
                 ) : (
-                  <span className="badge">{p.role === "seeker" ? "Caza" : "Se esconde"}</span>
+                  <span className="badge">{p.role === "seeker" ? t("role.seekShort") : t("role.hideShort")}</span>
                 )}
               </li>
             ))}
@@ -299,15 +307,15 @@ export function Lobby({ view, send, gps, onLeave }: Props) {
 
         <div className="block">
           <div className="block-head">
-            <h2>Ritmo</h2>
+            <h2>{t("lobby.pace")}</h2>
             <span className="faint small num">{Math.round(gamePlan(cfg).end / 60)}&nbsp;min</span>
           </div>
           {isHost && (
             <Segmented
-              label="Ritmo de la partida"
+              label={t("lobby.paceLabel")}
               value={preset}
               onChange={(id) => setConfig(PRESETS.find((p) => p.id === id)!.timing)}
-              options={PRESETS.map((p) => ({ value: p.id, label: p.label }))}
+              options={PRESETS.map((p) => ({ value: p.id, label: t(`preset.${p.id}`) }))}
             />
           )}
           <ZoneSchedule config={{ ...cfg, zone: { ...cfg.zone, radius: shownRadius } }} />
@@ -315,40 +323,47 @@ export function Lobby({ view, send, gps, onLeave }: Props) {
 
         <div className="block">
           <button className="disclosure" aria-expanded={advanced} onClick={() => setAdvanced(!advanced)}>
-            Reglas
+            {t("lobby.rules")}
             <ChevronDown size={20} />
           </button>
           {advanced && (
             <ul className="settings">
               <li>
                 <label htmlFor="opt-last">
-                  Gana el último superviviente
-                  <span className="hint">Si no, ganan todos los que aguanten</span>
+                  {t("rule.lastSurvivor")}
+                  <span className="hint">{t("rule.lastSurvivorHint")}</span>
                 </label>
                 <Switch id="opt-last" disabled={!isHost} checked={cfg.lastSurvivorWins} onChange={(v) => setConfig({ lastSurvivorWins: v })} />
               </li>
               <li>
                 <label htmlFor="opt-infect">
-                  Modo infección
-                  <span className="hint">Quien es pillado pasa a cazar</span>
+                  {t("rule.infection")}
+                  <span className="hint">{t("rule.infectionHint")}</span>
                 </label>
                 <Switch id="opt-infect" disabled={!isHost} checked={cfg.caughtBecomeSeekers} onChange={(v) => setConfig({ caughtBecomeSeekers: v })} />
+              </li>
+              <li>
+                <label htmlFor="opt-building">
+                  {t("rule.building")}
+                  <span className="hint">{t("rule.buildingHint")}</span>
+                </label>
+                <Switch id="opt-building" disabled={!isHost} checked={!!cfg.buildingMode} onChange={(v) => setConfig({ buildingMode: v })} />
               </li>
               {ADVANCED.map((o) => (
                 <li key={o.key}>
                   <label htmlFor={`opt-${o.key}`}>
-                    {o.label}
+                    {t(`set.${o.key}` as Key)}
                     {o.key === "finalRadius" && effectiveFinalRadius(cfg) < cfg.finalRadius ? (
-                      <span className="hint">Será de {Math.round(effectiveFinalRadius(cfg))}&nbsp;m: como mucho la mitad de la zona</span>
+                      <span className="hint">{t("set.finalAdjusted", { m: Math.round(effectiveFinalRadius(cfg)) })}</span>
                     ) : (
-                      o.hint && <span className="hint">{o.hint}</span>
+                      o.hint && <span className="hint">{t(o.hint)}</span>
                     )}
                   </label>
                   <select id={`opt-${o.key}`} disabled={!isHost} value={cfg[o.key]} onChange={(e) => setConfig({ [o.key]: Number(e.target.value) })}>
                     {!o.values.some(([v]) => v === cfg[o.key]) && <option value={cfg[o.key]}>{cfg[o.key]}</option>}
                     {o.values.map(([v, l]) => (
                       <option key={v} value={v}>
-                        {l}
+                        {label(l)}
                       </option>
                     ))}
                   </select>
@@ -362,14 +377,12 @@ export function Lobby({ view, send, gps, onLeave }: Props) {
       <footer className="cta-bar">
         {isHost ? (
           <button className="btn" disabled={seekers === 0 || hiders === 0} onClick={() => send({ t: "start" })}>
-            <span>{hiders === 0 ? "Falta al menos un escondido" : seekers === 0 ? "Falta un cazador" : "Empezar partida"}</span>
-            <span className="num">
-              {view.players.length} {view.players.length === 1 ? "jugador" : "jugadores"}
-            </span>
+            <span>{hiders === 0 ? t("lobby.needHider") : seekers === 0 ? t("lobby.needSeeker") : t("lobby.start")}</span>
+            <span className="num">{t("lobby.playerCount", { n: view.players.length })}</span>
           </button>
         ) : (
           <div className="waiting">
-            <span className="spinner" /> El anfitrión empezará la partida
+            <span className="spinner" /> {t("lobby.waiting")}
           </div>
         )}
       </footer>

@@ -26,8 +26,8 @@ function player(code, name) {
   ws.onmessage = (e) => {
     const m = JSON.parse(e.data);
     if (m.t === "state") p.view = m.view;
-    if (m.t === "event") p.events.push(m.event.text);
-    if (m.t === "error") p.errors.push(m.message);
+    if (m.t === "event") p.events.push(m.event.msg.key);
+    if (m.t === "error") p.errors.push(m.error.key);
   };
   p.send = (m) => ws.send(JSON.stringify(m));
   return p;
@@ -59,7 +59,7 @@ for (const p of [host, ana, bea]) p.send({ t: "loc", ...center, acc: 5 });
 await wait(300);
 ana.send({ t: "start" });
 await wait(300);
-assert(ana.errors.includes("Solo el anfitrión puede hacer eso"), "non-host cannot start");
+assert(ana.errors.includes("err.hostOnly"), "non-host cannot start");
 host.send({ t: "start" });
 await wait(4000); // one alarm tick moves hiding -> seeking
 assert(host.view.phase === "seeking", "game is in seeking phase");

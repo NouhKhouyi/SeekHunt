@@ -1,4 +1,5 @@
 import { Footprints, LifeBuoy, MapPinned, ShieldCheck, TrafficCone, UserCheck } from "lucide-react";
+import { useT } from "./i18n";
 
 const KEY = "seekhunt:consent:v1";
 
@@ -18,52 +19,34 @@ function saveConsent() {
   }
 }
 
+const RULES = [
+  { icon: MapPinned, b: "consent.locB", text: "consent.loc" },
+  { icon: ShieldCheck, b: "consent.histB", text: "consent.hist" },
+  { icon: UserCheck, b: "consent.ageB", text: "consent.age" },
+  { icon: Footprints, b: "consent.footB", text: "consent.foot" },
+  { icon: TrafficCone, b: "consent.streetB", text: "consent.street" },
+  { icon: LifeBuoy, b: "consent.sosB", text: "consent.sos" },
+] as const;
+
 /**
  * Shown before location is ever requested: what is shared, with whom, for how long, and the
  * ground rules of playing in the street. Location sharing only starts after "Aceptar".
  */
 export function Consent({ onAccept, onLeave }: { onAccept: () => void; onLeave: () => void }) {
+  const t = useT();
   return (
     <div className="dialog-scrim">
       <div className="dialog" role="dialog" aria-modal="true" aria-labelledby="consent-title" style={{ maxHeight: "92vh", overflowY: "auto" }}>
-        <h3 id="consent-title">Tu ubicación y las normas</h3>
+        <h3 id="consent-title">{t("consent.title")}</h3>
         <ul className="rules">
-          <li>
-            <MapPinned size={18} />
-            <span>
-              <b>Compartes tu ubicación solo en esta sala</b> y solo mientras la tengas abierta. Los cazadores no te ven, salvo en el radar, si sales de la zona o si pides ayuda.
-            </span>
-          </li>
-          <li>
-            <ShieldCheck size={18} />
-            <span>
-              <b>No guardamos historial.</b> La sala y las posiciones se borran 12&nbsp;h después de la última actividad. Puedes retirar el permiso en los ajustes del navegador.
-            </span>
-          </li>
-          <li>
-            <UserCheck size={18} />
-            <span>
-              <b>Tienes 14 años o más,</b> o juegas con permiso de tu madre, padre o tutor.
-            </span>
-          </li>
-          <li>
-            <Footprints size={18} />
-            <span>
-              <b>Se juega a pie.</b> Nada de bici, patinete ni coche. Por encima de 25&nbsp;km/h no se puede pillar.
-            </span>
-          </li>
-          <li>
-            <TrafficCone size={18} />
-            <span>
-              <b>Respeta la calle.</b> No cruces carreteras corriendo ni entres en propiedades privadas, obras o vías de tren.
-            </span>
-          </li>
-          <li>
-            <LifeBuoy size={18} />
-            <span>
-              <b>Si algo va mal, pulsa SOS</b> y todos verán dónde estás. En una emergencia, llama al&nbsp;112.
-            </span>
-          </li>
+          {RULES.map(({ icon: Icon, b, text }) => (
+            <li key={b}>
+              <Icon size={18} />
+              <span>
+                <b>{t(b)}</b> {t(text)}
+              </span>
+            </li>
+          ))}
         </ul>
         <div className="actions">
           <button
@@ -74,10 +57,10 @@ export function Consent({ onAccept, onLeave }: { onAccept: () => void; onLeave: 
               onAccept();
             }}
           >
-            Acepto, quiero jugar
+            {t("consent.accept")}
           </button>
           <button className="btn btn-soft btn-block" onClick={onLeave}>
-            Salir
+            {t("consent.leave")}
           </button>
         </div>
       </div>

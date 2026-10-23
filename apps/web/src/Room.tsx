@@ -1,13 +1,17 @@
 import type { MyFix } from "./location";
 import { useCallback, useEffect, useState } from "react";
 import { Consent, hasConsent } from "./Consent";
+import { useT } from "./i18n";
 import { Lobby } from "./Lobby";
 import { useMyLocation, useReportLocation, useWakeLock } from "./location";
 import { useRoom } from "./net";
 import { Play } from "./Play";
 import { ConfirmDialog, type ConfirmRequest, Loading, Notice, Toasts } from "./ui";
 
+const TITLE_KEY = { lobby: "title.lobby", hiding: "title.hiding", seeking: "title.seeking", ended: "title.ended" } as const;
+
 export default function Room({ code, name, onLeave }: { code: string; name: string; onLeave: () => void }) {
+  const t = useT();
   const conn = useRoom(code, name);
   const { view, send } = conn;
   const playing = view?.phase === "hiding" || view?.phase === "seeking";
@@ -17,13 +21,12 @@ export default function Room({ code, name, onLeave }: { code: string; name: stri
   const [confirm, setConfirm] = useState<ConfirmRequest | null>(null);
   useWakeLock(playing);
   useEffect(() => {
-    const phase = { lobby: "Sala", hiding: "Escondite", seeking: "En juego", ended: "Resultado" }[view?.phase ?? "lobby"];
-    document.title = `${phase} ${code} · SeekHunt`;
+    document.title = `${t(TITLE_KEY[view?.phase ?? "lobby"])} ${code} · SeekHunt`;
     return () => {
       document.title = "SeekHunt";
     };
-  }, [view?.phase, code]);
-  const sendFix = useCallback((f: MyFix) => send({ t: "loc", lat: f.lat, lng: f.lng, acc: f.acc }), [send]);
+  }, [view?.phase, code, t.lang]); // eslint-disable-line react-hooks/exhaustive-deps
+  const sendFix = useCallback((f: MyFix) => send({ t: "loc", lat: f.lat, lng: f.lng, acc: f.acc, alt: f.alt ?? null, altAcc: f.altAcc ?? null }), [send]);
   useReportLocation(conn.status === "open" ? gps.fix : null, sendFix);
 
   return (
@@ -35,18 +38,18 @@ export default function Room({ code, name, onLeave }: { code: string; name: stri
             tone="danger"
             action={
               <button className="notice-action" onClick={conn.dismissError}>
-                OK
+                {t("common.ok")}
               </button>
             }
           >
-            {conn.error}
+            {t.msg(conn.error)}
           </Notice>
         </div>
       )}
       {view && conn.status !== "open" && (
         <div className="conn">
           <span className="pill">
-            <span className="spinner" /> Reconectando…
+            <span className="spinner" /> {t("app.reconnecting")}
           </span>
         </div>
       )}

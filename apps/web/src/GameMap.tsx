@@ -133,7 +133,11 @@ export const GameMap = forwardRef<MapHandle, Props>(function GameMap({ zone, nex
     set("mask", d.zone ? { type: "FeatureCollection", features: [outsideMask(d.zone)] } : empty);
     set("zone", d.zone ? { type: "FeatureCollection", features: [polygon(d.zone)] } : empty);
     set("next", d.nextZone ? { type: "FeatureCollection", features: [polygon(d.nextZone)] } : empty);
-    set("pings", { type: "FeatureCollection", features: d.pings.map((p) => polygon(p.area, { label: p.label, kind: p.kind })) });
+    set("pings", { type: "FeatureCollection", features: d.pings.map((p) => polygon(p.area, { kind: p.kind })) });
+    set("ping-points", {
+      type: "FeatureCollection",
+      features: d.pings.map((p) => ({ type: "Feature", properties: { label: p.label, kind: p.kind }, geometry: { type: "Point", coordinates: [p.area.center.lng, p.area.center.lat] } })),
+    });
   };
 
   useEffect(() => {
@@ -172,18 +176,25 @@ export const GameMap = forwardRef<MapHandle, Props>(function GameMap({ zone, nex
     setMapReady(true);
     map.on("click", (e: MapMouseEvent) => onTapRef.current?.({ lat: e.lngLat.lat, lng: e.lngLat.lng }));
     map.on("load", () => {
-      for (const id of ["mask", "zone", "next", "pings"]) map.addSource(id, { type: "geojson", data: empty });
+      for (const id of ["mask", "zone", "next", "pings", "ping-points"]) map.addSource(id, { type: "geojson", data: empty });
       map.addLayer({ id: "mask", type: "fill", source: "mask", paint: { "fill-color": C.mask, "fill-opacity": C.maskOpacity } });
       map.addLayer({ id: "zone-fill", type: "fill", source: "zone", paint: { "fill-color": C.zone, "fill-opacity": 0.04 } });
       map.addLayer({ id: "zone-line", type: "line", source: "zone", paint: { "line-color": C.zone, "line-width": 3 } });
       map.addLayer({ id: "next-line", type: "line", source: "next", paint: { "line-color": C.next, "line-width": 2, "line-dasharray": [2, 1.5] } });
       map.addLayer({ id: "pings", type: "fill", source: "pings", paint: { "fill-color": C.zone, "fill-opacity": 0.16 } });
       map.addLayer({ id: "pings-line", type: "line", source: "pings", paint: { "line-color": C.zone, "line-width": 1.5, "line-dasharray": [1, 1] } });
+      // A precise radar circle can be a few metres wide: always mark its centre so it can't vanish at city zoom.
+      map.addLayer({
+        id: "ping-dots",
+        type: "circle",
+        source: "ping-points",
+        paint: { "circle-radius": 6, "circle-color": C.zone, "circle-stroke-color": C.halo, "circle-stroke-width": 2 },
+      });
       map.addLayer({
         id: "ping-labels",
         type: "symbol",
-        source: "pings",
-        layout: { "text-field": ["get", "label"], "text-size": 12, "text-font": ["Noto Sans Bold"] },
+        source: "ping-points",
+        layout: { "text-field": ["get", "label"], "text-size": 12, "text-font": ["Noto Sans Bold"], "text-offset": [0, 1.2], "text-anchor": "top" },
         paint: { "text-color": C.label, "text-halo-color": C.halo, "text-halo-width": 1.5 },
       });
       // Start collapsed to the (i) button; it still expands on tap.

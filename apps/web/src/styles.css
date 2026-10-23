@@ -53,6 +53,8 @@
 
 * { box-sizing: border-box; }
 html, body, #root { height: 100%; margin: 0; }
+/* Anything scrolled into view (keyboard focus, anchors) stops above the sticky start bar, never under it. */
+html:has(.cta-bar) { scroll-padding-bottom: calc(96px + var(--safe-b)); }
 body {
   background: var(--canvas);
   color: var(--ink);
@@ -178,7 +180,9 @@ input[type="range"] { width: 100%; accent-color: var(--ink); height: 28px; margi
   font-size: 0.8rem; font-weight: 600; color: var(--ink-2);
 }
 .hero figcaption .num { color: var(--ink); font-weight: 700; font-size: 0.85rem; }
-.hero-credit { position: absolute; right: 8px; top: calc(8px + var(--safe-t)); font-size: 9px; color: var(--ink-3); opacity: 0.8; }
+/* Attribution sits just above the caption, clear of the language switch. */
+.hero-credit { position: absolute; right: var(--gutter-r); bottom: 64px; font-size: 9px; color: var(--ink-3); opacity: 0.8; }
+@media (min-width: 880px) { .hero-credit { bottom: 8px; right: 12px; } }
 
 .home-panel {
   position: relative; z-index: 1; flex: 1; margin-top: -24px; background: var(--paper); border-radius: 24px 24px 0 0;
@@ -319,6 +323,31 @@ body:has(.lobby) .toasts { top: calc(66px + var(--safe-t)); }
 .players li.offline .avatar { opacity: 0.4; }
 .dot-online { width: 7px; height: 7px; border-radius: 50%; background: #1fb85a; display: inline-block; margin-right: 6px; vertical-align: 1px; }
 .players li.offline .dot-online { background: var(--ink-3); }
+
+/* Language switch */
+.lang { display: inline-flex; padding: 3px; gap: 2px; border-radius: 10px; background: var(--fill); flex: none; }
+.lang button {
+  border: 0; background: none; height: 32px; min-width: 40px; padding: 0 8px; border-radius: 8px; cursor: pointer;
+  font-size: 0.78rem; font-weight: 700; letter-spacing: 0.04em; color: var(--ink-3);
+}
+.lang button[aria-pressed="true"] { background: var(--paper); color: var(--ink); box-shadow: 0 1px 3px rgb(0 0 0 / 0.12); }
+.home-lang { position: absolute; z-index: 2; top: calc(12px + var(--safe-t)); right: var(--gutter-r); }
+.home-lang .lang { background: var(--paper); box-shadow: var(--shadow); }
+.panel-head.row { align-items: flex-start; }
+
+/* Building mode */
+.floor { display: flex; align-items: center; gap: 12px; padding: 8px 8px 8px 14px; border-radius: 14px; background: var(--fill); }
+.floor-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.floor-text b { font-size: 1.05rem; }
+.stepper { display: flex; align-items: center; gap: 2px; background: var(--paper); border-radius: 12px; padding: 2px; }
+.stepper .icon-btn.plain { margin: 0; color: var(--ink); }
+.stepper .icon-btn.plain:disabled { opacity: 0.3; }
+.stepper .num { min-width: 2.2ch; text-align: center; font-size: 1.25rem; }
+.radar-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.radar-list li { display: flex; align-items: center; gap: 8px; min-height: 40px; font-size: 0.9rem; border-bottom: 1px solid var(--line); }
+.radar-list li:last-child { border-bottom: 0; }
+.radar-list li svg { color: var(--blaze); flex: none; }
+.radar-list li span { flex: 1; min-width: 0; }
 
 /* Radius: the big number is itself the input. */
 .radius-input { display: flex; align-items: baseline; gap: 4px; cursor: text; align-self: flex-start; }

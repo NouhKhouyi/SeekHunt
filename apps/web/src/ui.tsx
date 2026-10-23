@@ -1,6 +1,7 @@
 import { AlertTriangle, Bell, CircleDot, Crosshair, Flag, LifeBuoy, Radar, UserPlus } from "lucide-react";
 import { effectiveFinalRadius, type GameConfig } from "@seekhunt/shared";
 import { type ReactNode, useEffect, useRef, useState } from "react";
+import { type Lang, locale, setLang, useT } from "./i18n";
 import type { Toast } from "./net";
 
 /** Server-synchronised clock that re-renders every `ms`. */
@@ -30,14 +31,15 @@ export const initials = (name: string) =>
 const TOAST_ICON = { info: UserPlus, zone: CircleDot, ping: Radar, catch: Crosshair, elim: AlertTriangle, warn: Bell, end: Flag, sos: LifeBuoy };
 
 export function Toasts({ toasts }: { toasts: Toast[] }) {
+  const t = useT();
   return (
     <div className="toasts" aria-live="polite">
-      {toasts.map((t) => {
-        const Icon = TOAST_ICON[t.kind];
+      {toasts.map((toast) => {
+        const Icon = TOAST_ICON[toast.kind];
         return (
-          <div key={t.id} className={`toast ${t.kind === "info" ? "" : "blaze"}`}>
+          <div key={toast.id} className={`toast ${toast.kind === "info" ? "" : "blaze"}`}>
             <Icon size={18} strokeWidth={2.25} />
-            {t.text}
+            {t.msg(toast.msg)}
           </div>
         );
       })}
@@ -114,6 +116,7 @@ export interface ConfirmRequest {
 
 /** In-app confirmation sheet; native confirm() looks out of place and is blocked in some webviews. */
 export function ConfirmDialog({ request, onClose }: { request: ConfirmRequest | null; onClose: () => void }) {
+  const t = useT();
   const ref = useRef<HTMLButtonElement>(null);
   useEffect(() => {
     if (!request) return;
@@ -140,7 +143,7 @@ export function ConfirmDialog({ request, onClose }: { request: ConfirmRequest | 
             {request.confirm}
           </button>
           <button className="btn btn-soft btn-block" onClick={onClose}>
-            Cancelar
+            {t("common.cancel")}
           </button>
         </div>
       </div>
@@ -149,10 +152,11 @@ export function ConfirmDialog({ request, onClose }: { request: ConfirmRequest | 
 }
 
 export function Loading() {
+  const t = useT();
   return (
     <div className="conn" style={{ top: "50%", bottom: "auto" }}>
       <span className="pill">
-        <span className="spinner" /> Cargando…
+        <span className="spinner" /> {t("app.loading")}
       </span>
     </div>
   );
@@ -172,20 +176,21 @@ export function gamePlan(config: GameConfig) {
 }
 
 const minutes = (s: number) => `${Math.round(s / 60)}′`;
-const meters = (m: number) => `${m >= 1000 ? (m / 1000).toLocaleString("es-ES", { maximumFractionDigits: 1 }) + " km" : Math.round(m) + " m"}`;
+const meters = (m: number) => `${m >= 1000 ? (m / 1000).toLocaleString(locale(), { maximumFractionDigits: 1 }) + " km" : Math.round(m) + " m"}`;
 
 /**
  * The pace of a game drawn as what actually happens: a line through time with one circle per zone,
  * each sized by its real radius and marked with the minute it begins.
  */
 export function ZoneSchedule({ config }: { config: GameConfig }) {
+  const t = useT();
   const { zones, end } = gamePlan(config);
   const r0 = config.zone.radius;
   const x = (t: number) => `${(t / end) * 100}%`;
   // Minute labels only where there is room for them; the first and last are always shown.
   const roomy = zones.length < 2 || config.shrinkIntervalSeconds / end > 0.085;
   return (
-    <div className="sched" role="img" aria-label={`Escondite de ${minutes(config.hideSeconds)}, ${config.shrinkCount} cierres cada ${minutes(config.shrinkIntervalSeconds)}, de ${meters(r0)} a ${meters(zones.at(-1)!.radius)}`}>
+    <div className="sched" role="img" aria-label={t("sched.aria", { hide: minutes(config.hideSeconds), n: config.shrinkCount, every: minutes(config.shrinkIntervalSeconds), from: meters(r0), to: meters(zones.at(-1)!.radius) })}>
       <div className="sched-plot">
         <span className="sched-line hide" style={{ left: 0, width: x(config.hideSeconds) }} />
         <span className="sched-line" style={{ left: x(config.hideSeconds), right: 0 }} />
@@ -201,7 +206,7 @@ export function ZoneSchedule({ config }: { config: GameConfig }) {
         <span style={{ left: "100%" }}>{minutes(end)}</span>
       </div>
       <div className="sched-legend">
-        <span>{config.hideSeconds > 0 ? `${minutes(config.hideSeconds)} para esconderse` : "Sin tiempo para esconderse"}</span>
+        <span>{config.hideSeconds > 0 ? t("sched.hide", { m: Math.round(config.hideSeconds / 60) }) : t("sched.noHide")}</span>
         <span className="num">
           {meters(r0)} → {meters(zones.at(-1)!.radius)}
         </span>
@@ -219,6 +224,24 @@ export function GameProgress({ config, elapsed }: { config: GameConfig; elapsed:
       <span className="progress-fill" style={{ width: pct(elapsed) }} />
       {zones.slice(1).map((z, i) => (
         <i key={i} className={elapsed >= z.at ? "passed" : undefined} style={{ left: pct(z.at) }} />
+      ))}
+    </div>
+  );
+}
+
+/** ES / EN switch. The choice is per device and remembered. */
+export function LangToggle() {
+  const t = useT();
+  const options: { value: Lang; label: string }[] = [
+    { value: "es", label: "ES" },
+    { value: "en", label: "EN" },
+  ];
+  return (
+    <div className="lang" role="group" aria-label={t("lang.label")}>
+      {options.map((o) => (
+        <button key={o.value} type="button" lang={o.value} aria-pressed={t.lang === o.value} onClick={() => setLang(o.value)}>
+          {o.label}
+        </button>
       ))}
     </div>
   );

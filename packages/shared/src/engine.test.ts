@@ -139,7 +139,9 @@ describe("engine", () => {
     const v = viewFor(s, id("seek"), 120_000);
     const ping = v.pings.find((p) => p.playerId === id("ana"))!;
     expect(distance(ping.area.center, center)).toBeLessThanOrEqual(ping.area.radius);
-    expect(viewFor(s, id("ana"), 120_000).pings.every((p) => p.playerId === id("seek"))).toBe(true);
+    // Hiders get the seeker's ping, and only that one.
+    const anaPings = viewFor(s, id("ana"), 120_000).pings;
+    expect(anaPings.map((p) => p.playerId)).toEqual([id("seek")]);
   });
 
   it("refuses a catch when both fresh fixes say the players are far apart", () => {
@@ -148,7 +150,7 @@ describe("engine", () => {
     handle(s, id("ana"), { t: "loc", ...offset(center, 400, 0), acc: 5 }, 60_000);
     handle(s, id("seek"), { t: "loc", ...center, acc: 5 }, 60_000);
     const code = s.players[id("ana")]!.catchCode!;
-    expect(() => handle(s, id("seek"), { t: "catch", code }, 61_000)).toThrow(/Estáis a unos 400 m/);
+    expect(() => handle(s, id("seek"), { t: "catch", code }, 61_000)).toThrow(expect.objectContaining({ key: "err.tooFar", params: { meters: 400, name: "ana" } }));
     // With a stale fix on one side we can't tell, so the code wins.
     handle(s, id("seek"), { t: "catch", code }, 100_000);
     expect(s.players[id("ana")]!.status).toBe("caught");
@@ -167,9 +169,35 @@ describe("engine", () => {
   it("warns 30 s before each shrink, once", () => {
     const s = startedGame(["seek", "ana", "bea"], { shrinkIntervalSeconds: 120 });
     tick(s, 60_000);
-    expect(tick(s, 60_000 + 89_000).some((e) => e.text.includes("30 s"))).toBe(false);
-    expect(tick(s, 60_000 + 90_000).some((e) => e.text.includes("30 s"))).toBe(true);
-    expect(tick(s, 60_000 + 95_000).some((e) => e.text.includes("30 s"))).toBe(false);
+    expect(tick(s, 60_000 + 89_000).some((e) => e.msg.key === "ev.zoneWarning")).toBe(false);
+    expect(tick(s, 60_000 + 90_000).some((e) => e.msg.key === "ev.zoneWarning")).toBe(true);
+    expect(tick(s, 60_000 + 95_000).some((e) => e.msg.key === "ev.zoneWarning")).toBe(false);
+  });
+
+  it("exact radar shows the real position with only the GPS error as radius", () => {
+    const s = startedGame(["seek", "ana", "bea"], { pingIntervalSeconds: 60, pingFuzzMeters: 0 });
+    tick(s, 60_000);
+    tick(s, 120_000, mulberry32(9));
+    const ping = viewFor(s, id("seek"), 120_000).pings.find((p) => p.playerId === id("ana"))!;
+    expect(distance(ping.area.center, center)).toBeLessThan(0.01);
+    expect(ping.area.radius).toBe(5);
+  });
+
+  it("building mode puts declared floors on the radar, and altitude only when it is trustworthy", () => {
+    const s = startedGame(["seek", "ana", "bea"], { pingIntervalSeconds: 60, buildingMode: true });
+    handle(s, id("ana"), { t: "floor", floor: 3 }, 1_000);
+    handle(s, id("bea"), { t: "floor", floor: 999 }, 1_000);
+    handle(s, id("ana"), { t: "loc", ...center, acc: 5, alt: 41.4, altAcc: 4 }, 31_000);
+    handle(s, id("bea"), { t: "loc", ...center, acc: 5, alt: 30, altAcc: 25 }, 31_000);
+    tick(s, 60_000);
+    tick(s, 120_000);
+    const pings = viewFor(s, id("seek"), 120_000).pings;
+    const ana = pings.find((p) => p.playerId === id("ana"))!;
+    const bea = pings.find((p) => p.playerId === id("bea"))!;
+    expect(ana.floor).toBe(3);
+    expect(ana.alt).toBe(41);
+    expect(bea.floor).toBe(200); // clamped
+    expect(bea.alt).toBeUndefined(); // ±25 m is not trusted
   });
 
   it("discards physically impossible jumps", () => {

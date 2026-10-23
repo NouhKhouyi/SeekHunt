@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { HERO_SIZE, HERO_ZONES } from "./heroGeometry";
+import { useT } from "./i18n";
 
 const STEP_MS = 2600;
 const LAST = HERO_ZONES.length - 1;
@@ -13,6 +14,7 @@ const place = (z: { x: number; y: number; r: number }) => ({ transform: `transla
  * schedule generator would do it, then the loop starts again.
  */
 export function Hero() {
+  const t = useT();
   const [step, setStep] = useState(reducedMotion ? 2 : 0);
 
   useEffect(() => {
@@ -28,7 +30,7 @@ export function Hero() {
 
   return (
     <figure className="hero">
-      <svg viewBox={`0 0 ${HERO_SIZE.w} ${HERO_SIZE.h}`} preserveAspectRatio="xMidYMid slice" role="img" aria-label="Mapa de Valencia con la zona de juego cerrándose por fases">
+      <svg viewBox={`0 0 ${HERO_SIZE.w} ${HERO_SIZE.h}`} preserveAspectRatio="xMidYMid slice" role="img" aria-label={t("hero.aria")}>
         <defs>
           <mask id="hero-outside">
             <rect width={HERO_SIZE.w} height={HERO_SIZE.h} fill="#fff" />
@@ -45,7 +47,7 @@ export function Hero() {
       <figcaption>
         <span>Valencia, Ciutat Vella</span>
         <span className="num" aria-live="off">
-          {i === 0 ? "Zona inicial" : i === LAST ? "Zona final" : `Cierre ${i} de ${LAST}`}, {zone.meters}&nbsp;m
+          {i === 0 ? t("hero.initial") : i === LAST ? t("hero.final") : t("hero.shrink", { i, n: LAST })}, {zone.meters}&nbsp;m
         </span>
       </figcaption>
       <small className="hero-credit">© OpenStreetMap, OpenMapTiles, OpenFreeMap</small>

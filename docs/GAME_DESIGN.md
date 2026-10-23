@@ -28,6 +28,26 @@ Solo con el GPS no se puede decidir una captura: falla entre 5 y 20 m, y más en
 
 Si nada de esto funciona, el escondido pulsa **"Me han pillado"**.
 
+## Precisión del radar y edificios
+
+**Lo que se puede afinar:**
+- La precisión del radar va de "Exacta" a ±300 m.
+- En "Exacta" el círculo es solo el error que el propio GPS declara. No se puede ir más allá: un móvil falla unos 5 m a cielo abierto, entre 10 y 20 m entre edificios y entre 30 y 100 m en interior.
+
+**Plantas.** Una web no puede saber de forma fiable en qué planta está alguien:
+- La altitud del GPS tiene más error que la posición horizontal, y dentro de un edificio casi nunca llega.
+- El barómetro, que sí lo resolvería, no está disponible para las webs.
+
+**Modo edificio (`buildingMode`).**
+- Cada jugador indica su planta con un selector (−5 a 200) y el radar la muestra junto al nombre: "Ana, planta 3".
+- Es una regla de honor, igual que tocar para pillar.
+- Si los dos móviles miden la altitud con un error de ±10 m o menos, el radar añade la diferencia ("9 m más arriba") como comprobación.
+- Si en algún momento se empaqueta como app nativa (Capacitor), el barómetro permitiría detectar las plantas solo.
+
+## Idiomas
+
+La interfaz está en español e inglés, y se elige automáticamente según el idioma del móvil (se puede cambiar con el selector ES/EN). El servidor nunca envía frases: envía claves con parámetros (`ev.caughtBy {by, name}`), y cada móvil las muestra en su idioma. Así, en una misma partida cada jugador ve los avisos en el suyo. Los textos están en `apps/web/src/i18n.ts`.
+
 ## Mecánicas para equilibrar
 
 | Mecánica | Por qué existe |

@@ -7,7 +7,8 @@ const URL = process.env.URL ?? "http://localhost:5173/?sim";
 const browser = await chromium.launch({ channel: process.env.BROWSER ?? "msedge" });
 const newPage = async (scheme = "light") => {
   const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, colorScheme: scheme });
-  await ctx.addInitScript(() => localStorage.setItem("seekhunt:consent:v1", "yes"));
+  // The selectors below use the Spanish labels, so pin the language.
+  await ctx.addInitScript((l) => (localStorage.setItem("seekhunt:consent:v1", "yes"), localStorage.setItem("seekhunt:lang", l)), "es");
   return ctx.newPage();
 };
 

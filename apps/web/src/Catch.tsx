@@ -1,6 +1,7 @@
 import { Keyboard, ScanLine, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { renderSVG } from "uqr";
+import { useT } from "./i18n";
 import { CodeInput } from "./ui";
 
 /** What a hider's QR encodes. The room code stops a QR from another game being accepted. */
@@ -8,20 +9,23 @@ export const qrPayload = (room: string, code: string) => `SEEKHUNT:${room}:${cod
 
 export function parseQr(text: string, room: string): { code: string } | { error: string } {
   const m = /^SEEKHUNT:([A-Z2-9]{5}):(\d{4})$/.exec(text.trim());
-  if (!m) return { error: "Ese QR no es de SeekHunt." };
-  if (m[1] !== room) return { error: "Ese QR es de otra partida." };
+  // Errors are message keys, translated where they are shown.
+  if (!m) return { error: "qr.notOurs" };
+  if (m[1] !== room) return { error: "qr.otherGame" };
   return { code: m[2]! };
 }
 
 export const qrSvg = (room: string, code: string) => renderSVG(qrPayload(room, code), { border: 2, ecc: "M", whiteColor: "#ffffff", blackColor: "#121417" });
 
 export function CatchQr({ room, code, size = 132 }: { room: string; code: string; size?: number }) {
+  const t = useT();
   const svg = useMemo(() => qrSvg(room, code), [room, code]);
-  return <div className="qr" style={{ width: size, height: size }} role="img" aria-label={`Código QR de captura ${code}`} dangerouslySetInnerHTML={{ __html: svg }} />;
+  return <div className="qr" style={{ width: size, height: size }} role="img" aria-label={t("qr.aria", { code })} dangerouslySetInnerHTML={{ __html: svg }} />;
 }
 
 /** Full-screen QR so the seeker can scan it from arm's length, even in sunlight. */
 export function QrFullscreen({ room, code, onClose }: { room: string; code: string; onClose: () => void }) {
+  const t = useT();
   const close = useRef<HTMLButtonElement>(null);
   useEffect(() => {
     close.current?.focus();
@@ -30,12 +34,12 @@ export function QrFullscreen({ room, code, onClose }: { room: string; code: stri
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
   return (
-    <div className="qr-full" onClick={onClose} role="dialog" aria-modal="true" aria-label="Código de captura a pantalla completa">
+    <div className="qr-full" onClick={onClose} role="dialog" aria-modal="true" aria-label={t("qr.fullAria")}>
       <CatchQr room={room} code={code} size={Math.min(window.innerWidth - 48, 420)} />
       <div className="capture-code num" translate="no">{code}</div>
-      <p>Sube el brillo y deja que el cazador lo escanee.</p>
+      <p>{t("qr.fullHint")}</p>
       <button ref={close} className="btn btn-sm" onClick={onClose}>
-        Cerrar
+        {t("common.close")}
       </button>
     </div>
   );
@@ -65,6 +69,7 @@ export async function createDetector(): Promise<Detector> {
 
 /** Camera scanner: rear camera, ~8 detections per second, stops at the first valid SeekHunt QR. */
 export function Scanner({ room, onCode, onClose }: { room: string; onCode: (code: string) => void; onClose: () => void }) {
+  const t = useT();
   const video = useRef<HTMLVideoElement>(null);
   const [state, setState] = useState<ScanState>("starting");
   const [hint, setHint] = useState<string | null>(null);
@@ -119,10 +124,10 @@ export function Scanner({ room, onCode, onClose }: { room: string; onCode: (code
   }, [room, onCode, typing]);
 
   return (
-    <div className="scanner" role="dialog" aria-modal="true" aria-label="Escanear código de captura">
+    <div className="scanner" role="dialog" aria-modal="true" aria-label={t("scan.aria")}>
       <header className="scanner-top">
-        <span className="label">Pillar</span>
-        <button className="icon-btn" onClick={onClose} aria-label="Cerrar">
+        <span className="label">{t("scan.title")}</span>
+        <button className="icon-btn" onClick={onClose} aria-label={t("common.close")}>
           <X size={20} />
         </button>
       </header>
@@ -135,14 +140,14 @@ export function Scanner({ room, onCode, onClose }: { room: string; onCode: (code
             if (typed.length === 4) onCode(typed);
           }}
         >
-          <h2 className="display">Escribe su código</h2>
-          <p className="muted">Son las 4 cifras grandes que aparecen debajo de su QR.</p>
-          <CodeInput length={4} numeric value={typed} onChange={setTyped} label="Código de captura" autoFocus />
+          <h2 className="display">{t("scan.typeTitle")}</h2>
+          <p className="muted">{t("scan.typeBody")}</p>
+          <CodeInput length={4} numeric value={typed} onChange={setTyped} label={t("scan.codeLabel")} autoFocus />
           <button className="btn btn-blaze btn-block" disabled={typed.length !== 4}>
-            Pillar
+            {t("scan.catch")}
           </button>
           <button type="button" className="btn btn-text" onClick={() => setTyping(false)}>
-            <ScanLine size={18} /> Volver a escanear
+            <ScanLine size={18} /> {t("scan.back")}
           </button>
         </form>
       ) : (
@@ -153,13 +158,13 @@ export function Scanner({ room, onCode, onClose }: { room: string; onCode: (code
           </div>
           <div className="scanner-foot">
             <p>
-              {state === "starting" && "Abriendo la cámara…"}
-              {state === "scanning" && (hint ?? "Apunta al QR de la pantalla del escondido.")}
-              {state === "denied" && "Sin permiso para usar la cámara. Actívalo en los ajustes del navegador o escribe el código."}
-              {state === "nocamera" && "Este dispositivo no tiene cámara. Escribe el código."}
+              {state === "starting" && t("scan.starting")}
+              {state === "scanning" && (hint ? t.msg({ key: hint }) : t("scan.point"))}
+              {state === "denied" && t("scan.denied")}
+              {state === "nocamera" && t("scan.nocamera")}
             </p>
             <button className="btn btn-soft btn-block" onClick={() => setTyping(true)}>
-              <Keyboard size={18} /> Escribir código
+              <Keyboard size={18} /> {t("scan.type")}
             </button>
           </div>
         </>

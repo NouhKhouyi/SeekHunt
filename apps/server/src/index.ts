@@ -42,12 +42,12 @@ export default {
         const res = await env.ROOMS.get(env.ROOMS.idFromName(candidate)).fetch("https://room/init", { method: "POST" });
         if (res.ok) return json({ code: candidate });
       }
-      return json({ error: "No se pudo crear la sala" }, 503);
+      return json({ error: "err.createFailed" }, 503);
     }
 
     if ((kind === "ws" || kind === "api") && code) {
       const roomCode = (kind === "api" ? url.pathname.split("/")[3] : code)?.toUpperCase() ?? "";
-      if (!CODE_RE.test(roomCode)) return json({ error: "Código inválido" }, 400);
+      if (!CODE_RE.test(roomCode)) return json({ error: "err.invalidCode" }, 400);
       const stub = env.ROOMS.get(env.ROOMS.idFromName(roomCode));
       if (kind === "ws") {
         if (req.headers.get("Upgrade") !== "websocket") return json({ error: "Expected websocket" }, 426);
@@ -90,7 +90,7 @@ export class GameRoom extends DurableObject<Env> {
     if (url.pathname === "/info") {
       return json({ exists: !!this.game, phase: this.game?.phase ?? null, players: this.game?.order.length ?? 0 });
     }
-    if (!this.game) return json({ error: "La sala no existe" }, 404);
+    if (!this.game) return json({ error: "err.noRoom" }, 404);
     if (!this.game.code) {
       this.game.code = url.pathname.split("/")[2]!.toUpperCase();
       await this.save();
@@ -119,14 +119,13 @@ export class GameRoom extends DurableObject<Env> {
         events.push(...hello(game, msg));
         ws.serializeAttachment({ playerId: msg.playerId } satisfies Attachment);
       } else {
-        if (!att.playerId) throw new GameError("Saluda primero");
+        if (!att.playerId) throw new GameError("err.helloFirst");
         events.push(...handle(game, att.playerId, msg, now));
       }
       events.push(...tick(game, now));
     } catch (err) {
-      const message = err instanceof GameError ? err.message : "Error inesperado";
       if (!(err instanceof GameError)) console.error(err);
-      this.send(ws, { t: "error", message });
+      this.send(ws, { t: "error", error: err instanceof GameError ? err.msg : { key: "err.unexpected" } });
       return;
     }
     this.lastActivity = now;
@@ -212,12 +211,12 @@ export class GameRoom extends DurableObject<Env> {
       if (!att?.playerId) continue;
       if (!this.game?.players[att.playerId]) {
         // Kicked.
-        this.send(ws, { t: "error", message: "Has sido expulsado de la sala" });
+        this.send(ws, { t: "error", error: { key: "err.kicked" } });
         ws.close(4001, "kicked");
         continue;
       }
       for (const e of events) {
-        if (!e.to || e.to.includes(att.playerId)) this.send(ws, { t: "event", event: { kind: e.kind, text: e.text }, at: now });
+        if (!e.to || e.to.includes(att.playerId)) this.send(ws, { t: "event", event: { kind: e.kind, msg: e.msg }, at: now });
       }
       this.sendState(ws, now);
     }

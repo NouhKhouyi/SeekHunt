@@ -27,6 +27,8 @@ export interface GameConfig {
   caughtBecomeSeekers: boolean;
   /** The game ends as soon as a single hider is left standing. */
   lastSurvivorWins: boolean;
+  /** Players declare which floor they are on, and the radar shows it. For games inside buildings. */
+  buildingMode: boolean;
 }
 
 export const DEFAULT_CONFIG: GameConfig = {
@@ -43,6 +45,7 @@ export const DEFAULT_CONFIG: GameConfig = {
   staleLocationSeconds: 90,
   caughtBecomeSeekers: false,
   lastSurvivorWins: true,
+  buildingMode: false,
 };
 
 const clamp = (v: unknown, min: number, max: number, fallback: number) =>
@@ -87,5 +90,7 @@ export function sanitizeConfig(input: Partial<GameConfig> | undefined, base: Gam
     staleLocationSeconds: clamp(i.staleLocationSeconds, 15, 3600, base.staleLocationSeconds),
     caughtBecomeSeekers: typeof i.caughtBecomeSeekers === "boolean" ? i.caughtBecomeSeekers : base.caughtBecomeSeekers,
     lastSurvivorWins: typeof i.lastSurvivorWins === "boolean" ? i.lastSurvivorWins : base.lastSurvivorWins,
+    // `?? false`: rooms saved before this option existed have no value for it.
+    buildingMode: typeof i.buildingMode === "boolean" ? i.buildingMode : (base.buildingMode ?? false),
   };
 }
