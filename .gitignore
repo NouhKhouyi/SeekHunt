@@ -9,3 +9,4 @@ dist/
 
 # Agent skills are installed locally from skills-lock.json, not vendored.
 .claude/
+skills-lock.json

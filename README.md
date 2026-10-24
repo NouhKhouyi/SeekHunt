@@ -11,6 +11,7 @@
 <p align="center">
   <a href="https://seekhunt.nouhk.workers.dev"><b>Play</b></a> ·
   <a href="docs/GAME_DESIGN.md">Game design</a> ·
+  <a href="https://github.com/NouhKhouyi/SeekHunt/discussions">Discussions</a> ·
   <a href="CONTRIBUTING.md">Contributing</a> ·
   <a href="README.es.md">Español</a>
 </p>
@@ -164,7 +165,10 @@ native wrapper so location keeps working with the screen locked. See the
 
 Playtest reports are the most useful contribution: play a game and
 [describe how it went](https://github.com/NouhKhouyi/SeekHunt/issues/new?template=playtest.yml).
-For code changes, see [CONTRIBUTING.md](CONTRIBUTING.md). Please report
+Questions and ideas are welcome in
+[Discussions](https://github.com/NouhKhouyi/SeekHunt/discussions), and issues
+labelled [good first issue](https://github.com/NouhKhouyi/SeekHunt/labels/good%20first%20issue)
+are a good place to start. For code changes, see [CONTRIBUTING.md](CONTRIBUTING.md). Please report
 security or privacy issues privately, as described in [SECURITY.md](SECURITY.md).
 
 ## License

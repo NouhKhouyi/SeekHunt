@@ -11,6 +11,7 @@
 <p align="center">
   <a href="https://seekhunt.nouhk.workers.dev"><b>Jugar</b></a> ·
   <a href="docs/GAME_DESIGN.es.md">Diseño del juego</a> ·
+  <a href="https://github.com/NouhKhouyi/SeekHunt/discussions">Comunidad</a> ·
   <a href="CONTRIBUTING.md">Contribuir</a> ·
   <a href="README.md">English</a>
 </p>
