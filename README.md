@@ -20,29 +20,19 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT license"></a>
 </p>
 
-<table>
-  <tr>
-    <td width="330" valign="top">
-      <img src="docs/assets/gameplay.gif" width="320" alt="A hider's phone during a game: the countdown, the seeker's release, the zone closing, stepping outside and back in, and winning as the last survivor">
-    </td>
-    <td valign="top">
-      <p>
-        One player seeks, everyone else hides, and the play area shrinks every
-        few minutes until a single survivor is left.
-      </p>
-      <p>
-        SeekHunt runs in the phone's browser: one person creates a room, places
-        the zone over the neighbourhood and shares the link. There is nothing
-        to install and no account to create.
-      </p>
-      <p>
-        The recording shows one hider's phone during a short game: the head
-        start, the seeker's release, the radar, the zone closing, a moment
-        outside the zone, and the final result.
-      </p>
-    </td>
-  </tr>
-</table>
+One player seeks, everyone else hides, and the play area shrinks every few
+minutes until a single survivor is left. SeekHunt runs in the phone's browser:
+one person creates a room, places the zone over the neighbourhood and shares
+the link. There is nothing to install and no account to create.
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/gameplay-dark.gif">
+    <img src="docs/assets/gameplay-light.gif" width="300" alt="A hider's phone during a short game: the countdown, the seeker's release, the radar, the zone closing, stepping outside the zone, and winning as the last survivor">
+  </picture>
+  <br>
+  <sub>A hider's phone during a short game, from the head start to the result.</sub>
+</p>
 
 ## How a game works
 
@@ -76,10 +66,10 @@
 - **Languages.** English and Spanish, chosen per device.
 
 <p align="center">
-  <img src="docs/assets/screen-release.webp" width="200" alt="The seeker is released">
-  <img src="docs/assets/screen-closing.webp" width="200" alt="The zone starts closing">
-  <img src="docs/assets/screen-outside.webp" width="200" alt="A hider outside the zone, with the distance and direction back">
-  <img src="docs/assets/screen-result.webp" width="200" alt="The end-of-game recap">
+  <img src="docs/assets/screen-release.webp" width="180" alt="The seeker is released">
+  <img src="docs/assets/screen-closing.webp" width="180" alt="The zone starts closing">
+  <img src="docs/assets/screen-outside.webp" width="180" alt="A hider outside the zone, with the distance and direction back">
+  <img src="docs/assets/screen-result.webp" width="180" alt="The end-of-game recap">
 </p>
 
 ## Fair play, safety and privacy

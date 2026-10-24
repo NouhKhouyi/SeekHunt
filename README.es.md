@@ -20,29 +20,19 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/licencia-MIT-blue" alt="Licencia MIT"></a>
 </p>
 
-<table>
-  <tr>
-    <td width="330" valign="top">
-      <img src="docs/assets/gameplay.gif" width="320" alt="El móvil de un escondido durante una partida: la cuenta atrás, la salida del cazador, el cierre de la zona, una salida de la zona y la victoria">
-    </td>
-    <td valign="top">
-      <p>
-        Una persona busca, el resto se esconde, y la zona de juego se reduce
-        cada pocos minutos hasta que solo queda un superviviente.
-      </p>
-      <p>
-        SeekHunt funciona en el navegador del móvil: alguien crea una sala,
-        coloca la zona sobre el barrio y comparte el enlace. No hay que
-        instalar nada ni crear una cuenta.
-      </p>
-      <p>
-        La grabación muestra el móvil de un escondido durante una partida
-        corta: la ventaja inicial, la salida del cazador, el radar, el cierre de
-        la zona, un momento fuera de ella y el resultado final.
-      </p>
-    </td>
-  </tr>
-</table>
+Una persona busca, el resto se esconde, y la zona de juego se reduce cada
+pocos minutos hasta que solo queda un superviviente. SeekHunt funciona en el
+navegador del móvil: alguien crea una sala, coloca la zona sobre el barrio y
+comparte el enlace. No hay que instalar nada ni crear una cuenta.
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/gameplay-dark.gif">
+    <img src="docs/assets/gameplay-light.gif" width="300" alt="El móvil de un escondido durante una partida corta: la cuenta atrás, la salida del cazador, el radar, el cierre de la zona, una salida de la zona y la victoria">
+  </picture>
+  <br>
+  <sub>El móvil de un escondido durante una partida corta, del inicio al resultado.</sub>
+</p>
 
 ## Cómo es una partida
 
@@ -75,10 +65,10 @@
 - **Idiomas.** Español e inglés, según el móvil.
 
 <p align="center">
-  <img src="docs/assets/screen-release.webp" width="200" alt="Sale el cazador">
-  <img src="docs/assets/screen-closing.webp" width="200" alt="La zona empieza a cerrarse">
-  <img src="docs/assets/screen-outside.webp" width="200" alt="Un escondido fuera de la zona">
-  <img src="docs/assets/screen-result.webp" width="200" alt="El resumen final">
+  <img src="docs/assets/screen-release.webp" width="180" alt="Sale el cazador">
+  <img src="docs/assets/screen-closing.webp" width="180" alt="La zona empieza a cerrarse">
+  <img src="docs/assets/screen-outside.webp" width="180" alt="Un escondido fuera de la zona">
+  <img src="docs/assets/screen-result.webp" width="180" alt="El resumen final">
 </p>
 
 ## Juego limpio, seguridad y privacidad
