@@ -1,129 +1,142 @@
 <p align="center">
-  <img src="apps/web/public/icon.svg" width="72" alt="">
+  <img src="apps/web/public/icon.svg" width="64" alt="">
 </p>
 
 <h1 align="center">SeekHunt</h1>
 
 <p align="center">
-  <b>Hide. The zone is closing.</b><br>
-  Real-life hide and seek on your phone: one seeker, a zone that shrinks every
-  few minutes, and a single survivor.
+  Real-life hide and seek on your phone, with a play zone that closes in.
 </p>
 
 <p align="center">
-  <a href="https://seekhunt.nouhk.workers.dev"><img src="https://img.shields.io/badge/▶_play_now-free,_no_install-ff5714?style=for-the-badge" alt="Play now"></a>
+  <a href="https://seekhunt.nouhk.workers.dev"><b>Play</b></a> ·
+  <a href="docs/GAME_DESIGN.md">Game design</a> ·
+  <a href="CONTRIBUTING.md">Contributing</a> ·
+  <a href="README.es.md">Español</a>
 </p>
 
 <p align="center">
   <a href="https://github.com/NouhKhouyi/SeekHunt/actions/workflows/ci.yml"><img src="https://github.com/NouhKhouyi/SeekHunt/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-121417" alt="MIT license"></a>
-  <img src="https://img.shields.io/badge/PWA-installable-121417" alt="Installable PWA">
-  <img src="https://img.shields.io/badge/runs_on-Cloudflare_Workers-f38020" alt="Runs on Cloudflare Workers">
-  <a href="README.es.md"><img src="https://img.shields.io/badge/🇪🇸-leer_en_español-121417" alt="Leer en español"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT license"></a>
 </p>
+
+<table>
+  <tr>
+    <td width="330" valign="top">
+      <img src="docs/assets/gameplay.gif" width="320" alt="A hider's phone during a game: the countdown, the seeker's release, the zone closing, stepping outside and back in, and winning as the last survivor">
+    </td>
+    <td valign="top">
+      <p>
+        One player seeks, everyone else hides, and the play area shrinks every
+        few minutes until a single survivor is left.
+      </p>
+      <p>
+        SeekHunt runs in the phone's browser: one person creates a room, places
+        the zone over the neighbourhood and shares the link. There is nothing
+        to install and no account to create.
+      </p>
+      <p>
+        The recording shows one hider's phone during a short game: the head
+        start, the seeker's release, the radar, the zone closing, a moment
+        outside the zone, and the final result.
+      </p>
+    </td>
+  </tr>
+</table>
+
+## How a game works
+
+1. **Lobby.** The host creates a room, sets the zone's centre and radius on the
+   map, picks a pace and shares the link. Players join from their browsers.
+2. **Hiding.** Hiders get a head start while the seeker waits at the start.
+3. **Seeking.** The seeker is released and the zone closes in stages. The next
+   zone is always visible, so players can plan their route. Anyone who leaves
+   the zone is revealed to the seeker and has a short grace period to return.
+4. **Catching.** The seeker tags a hider and scans the QR code on their screen,
+   or types its four digits.
+5. **The end.** The last hider standing wins, or every survivor if time runs
+   out. Everyone gets a recap of the game and a result image to share.
+
+## Features
+
+- **Shrinking zone.** Each zone fits inside the previous one and is derived
+  from a shared seed, so every phone shows exactly the same circles.
+- **Radar.** At a set interval the seeker sees an approximate area for each
+  hider, and hiders see the seekers' positions. Precision is configurable.
+- **QR catches.** Native barcode scanning on Android and a self-hosted
+  WebAssembly scanner on iPhone, with manual code entry as a fallback.
+- **Host controls.** Pace presets, game rules, role assignment and a pause that
+  freezes every timer.
+- **Game modes.** Last survivor, infection (caught players become seekers) and
+  building mode, where players declare their floor.
+- **Guidance in play.** A countdown before the release, notices when the zone
+  closes, and a direction and distance back to the zone for anyone outside it.
+- **Recap.** Duration, catches, survivors, a timeline of the game and a
+  shareable result image.
+- **Languages.** English and Spanish, chosen per device.
 
 <p align="center">
-  <img src="docs/assets/gameplay.gif" width="860" alt="Three phones playing a game of SeekHunt: the seeker and two hiders. A countdown, the seeker is released, the radar pulses, the zone closes, a hider strays outside, and the seeker catches Ana by her code">
-  <br>
-  <sub>Three phones playing one game, sped up. Left: the seeker. Middle and right: the hiders.</sub>
+  <img src="docs/assets/screen-release.webp" width="200" alt="The seeker is released">
+  <img src="docs/assets/screen-closing.webp" width="200" alt="The zone starts closing">
+  <img src="docs/assets/screen-outside.webp" width="200" alt="A hider outside the zone, with the distance and direction back">
+  <img src="docs/assets/screen-result.webp" width="200" alt="The end-of-game recap">
 </p>
 
-## 🏃 How to play
+## Fair play, safety and privacy
 
-1. **Make a room.** One person creates a game, drags the zone over your
-   neighbourhood and shares the link. Everyone joins from their phone's browser
-   — no app store, no account.
-2. **Hide.** Hiders get a head start while the seeker waits. Three, two, one…
-   *the seeker is out*.
-3. **Stay inside.** Every few minutes the zone closes in, battle-royale style.
-   The next circle is always on the map, so you can plan your run. Step outside
-   and you're revealed — get back in before the countdown ends.
-4. **Get caught — properly.** The seeker has to tag you, then scan the QR code
-   on your screen. GPS alone never decides a catch.
-5. **Last one standing wins.** Then everyone gets the recap: who caught whom,
-   when, and a result card to brag about.
+**The server decides.** Game rules run on the server, and each phone receives
+only what its player is allowed to see. Hidden positions never reach the
+browser.
 
-## ✨ What's in the box
+**Catches need a real encounter.** A catch requires the hider's code and, when
+both phones have a recent position, the players must be within about 80 metres
+of each other. A seeker cannot skip that check by turning off their own GPS.
+Repeated wrong codes trigger an increasing cooldown, so codes cannot be
+guessed. Catches are refused above 25 km/h, and implausible GPS jumps are
+discarded.
 
-| | |
-|---|---|
-| 🎯 **A zone that closes in** | A real battle-royale schedule: every circle fits inside the last, computed from a seed so every phone sees exactly the same zone. |
-| 📡 **Radar** | Every few minutes the seeker sees a rough circle around each hider — and hiders see the seekers. Fresh pings pulse like sonar. |
-| 🔳 **QR catches** | Tag, scan, caught. Works on Android and iPhone, and you can type the 4-digit code if the camera won't cooperate. |
-| 🎬 **Big moments** | A 3-2-1 before the release, *GO HUNT!*, and a banner every time the zone starts to close. |
-| 🧭 **The way back** | Strayed outside? An arrow and the distance point you back to safety. |
-| ⏸️ **Host pause** | Freezes every clock, the zone and the radar. Resume and the game carries on exactly where it was. |
-| 🏆 **Recap and result card** | Duration, catches, a timeline of the game, and a shareable image of your game's real zones. |
-| 🧟 **Infection mode** | Caught players join the hunt. Perfect for big groups. |
-| 🏢 **Building mode** | Playing indoors? Players declare their floor and the radar shows it. |
-| 🆘 **SOS** | One tap reveals you to everyone with an alert. Safety first, always. |
-| 🌍 **English and Spanish** | Each phone shows the game in its own language — even in the same room. |
+**Safety comes first.** Players consent before any location is requested. Any
+player can send an SOS that reveals their position to everyone, the host can
+pause the game at any time, and the app reminds players to stay on foot and
+off roads.
 
-<p align="center">
-  <img src="docs/assets/screen-lobby.webp" width="200" alt="The lobby: zone radius, players and pace">
-  <img src="docs/assets/screen-radar.webp" width="200" alt="The seeker's map during a radar ping">
-  <img src="docs/assets/screen-moment.webp" width="200" alt="The seeker is released: a full-screen GO HUNT!">
-  <img src="docs/assets/screen-results.webp" width="200" alt="The recap: winner, duration, catches and standings">
-</p>
+**Minimal data.** Only each player's latest position is kept, and rooms are
+deleted after 12 hours without activity.
 
-## 🛡️ Fair and safe by design
-
-**No cheating your way to a win.**
-
-- **The server is the referee.** Each phone only ever receives what its player
-  is allowed to see, so hidden positions can't be dug out of the browser.
-- **You have to actually meet.** A catch needs the hider's code *and*, when
-  both phones know where they are, the two of you within ~80 m. Switching your
-  own GPS off doesn't skip the check.
-- **No guessing codes.** Three wrong codes trigger a cooldown that keeps
-  doubling, so trying all 10,000 would take days.
-- **No cars.** Above 25 km/h you can't catch anyone, and impossible GPS jumps
-  are thrown away.
-
-**Built for playing in the street.**
-
-- Location is only requested after a clear consent screen: what's shared, with
-  whom and for how long.
-- No history: only each player's latest position is kept, and rooms are
-  deleted after 12 hours.
-- SOS for everyone, a host pause, a reminder to play on foot, and a
-  14+ / guardian rule.
-
-Read the full rules, the balancing and the reasoning in the
+The complete rules and the reasoning behind them are in the
 [game design document](docs/GAME_DESIGN.md).
 
-## 🧩 How it works
+## Architecture
 
 ```mermaid
 flowchart LR
-    P1["📱 Seeker"] <-- WebSocket --> R
-    P2["📱 Hider"] <-- WebSocket --> R
-    P3["📱 Hider"] <-- WebSocket --> R
-    subgraph CF["Cloudflare"]
-      W["Worker<br/>web app · API"] --> R["Durable Object<br/>one per room<br/>authoritative state"]
-      R -- "alarm every 3 s" --> R
+    A["Phone"] <-- WebSocket --> R
+    B["Phone"] <-- WebSocket --> R
+    C["Phone"] <-- WebSocket --> R
+    subgraph Cloudflare
+      W["Worker: web app and API"] --> R["Durable Object: one per room, authoritative state"]
     end
-    R --> E["packages/shared<br/>pure game engine"]
+    R --> E["packages/shared: game engine"]
 ```
 
-| Part | Tech |
+| Component | Technology |
 |---|---|
-| Client | React 19, Vite and TypeScript. An installable PWA that keeps the screen awake during a game. |
-| Map | MapLibre GL with OpenFreeMap tiles — free, no API key. |
-| Real time | Cloudflare Workers and **Durable Objects**: one instance per room, hibernating WebSockets, and alarms as the game clock. |
-| Rules | `packages/shared`: a pure, server-authoritative game engine shared by client and server, with tests. |
+| Client | React 19, Vite and TypeScript, packaged as an installable PWA |
+| Map | MapLibre GL with OpenFreeMap tiles (no API key) |
+| Real time | Cloudflare Workers and Durable Objects, with hibernating WebSockets and alarms as the game clock |
+| Game rules | `packages/shared`, a pure engine shared by client and server and covered by tests |
 
 ```text
-apps/web          the PWA
-apps/server       the Worker and the GameRoom Durable Object
-packages/shared   game engine, zones, geometry, protocol
-scripts/          end-to-end smoke test, accessibility audit, artwork
+apps/web          progressive web app
+apps/server       Worker and the GameRoom Durable Object
+packages/shared   game engine, zones, geometry and protocol
+scripts/          end-to-end and accessibility checks, artwork generation
 docs/             game design
 ```
 
-## 🚀 Run it yourself
+## Getting started
 
-You need Node.js 22 or newer.
+Requires Node.js 22 or later.
 
 ```bash
 git clone https://github.com/NouhKhouyi/SeekHunt
@@ -132,53 +145,40 @@ npm install
 npm run dev        # Worker on :8787, web app on :5173
 ```
 
-**Play from one desk.** Open <http://localhost:5173/?sim> in a few tabs. In
-simulation mode, tapping the map moves your player.
+- **Simulation.** Open <http://localhost:5173/?sim> in several tabs. Tapping the
+  map moves your player, so a full game can be played from one computer.
+- **Phones on the same network.** Browsers only expose GPS and the camera on
+  HTTPS pages. Run `npm run dev:phone` and open `https://<your-ip>:5173`,
+  accepting the certificate warning.
+- **Deployment.** With a Cloudflare account, run `npx wrangler login` once and
+  then `npm run deploy`.
 
-**Play with phones on your Wi-Fi.** Phones only give GPS and the camera to
-`https` pages, so run `npm run dev:phone` and open `https://<your-pc-ip>:5173`
-(accept the certificate warning).
-
-**Deploy your own.** With a free Cloudflare account:
-
-```bash
-npx wrangler login   # once
-npm run deploy       # builds the web app and publishes the Worker
-```
-
-<details>
-<summary><b>Checks and tools</b></summary>
+### Checks
 
 ```bash
-npm test                       # game engine tests
 npm run typecheck
+npm test                       # game engine tests
 node scripts/smoke.mjs         # a full game over WebSocket against the dev server
-node scripts/a11y.mjs          # axe accessibility audit of every screen, light and dark
-node scripts/qr-roundtrip.mjs  # the scanner reads the catch QR (the iPhone zxing-wasm path)
-node scripts/og-image.mjs      # regenerates the link-preview images
+node scripts/a11y.mjs          # accessibility audit of every screen, light and dark
+node scripts/qr-roundtrip.mjs  # verifies the scanner reads the catch QR code
 ```
 
-</details>
+## Roadmap
 
-## 🗺️ What's next
+Planned work includes location-based questions answered by the server, player
+abilities with limited charges, comeback mechanics for the final stages, and a
+native wrapper so location keeps working with the screen locked. See the
+[roadmap](docs/GAME_DESIGN.md#roadmap-from-competitor-research) for details.
 
-Jet Lag–style questions answered by the server ("are you within 500 m?"),
-abilities with charges (decoys, silence, an extra ping), comeback mechanics for
-the final minutes, and a native wrapper so GPS keeps working with the screen
-locked. The full roadmap is in the
-[game design document](docs/GAME_DESIGN.md#roadmap-from-competitor-research).
+## Contributing
 
-## 🤝 Contributing
+Playtest reports are the most useful contribution: play a game and
+[describe how it went](https://github.com/NouhKhouyi/SeekHunt/issues/new?template=playtest.yml).
+For code changes, see [CONTRIBUTING.md](CONTRIBUTING.md). Please report
+security or privacy issues privately, as described in [SECURITY.md](SECURITY.md).
 
-The best contribution is a game with friends and a
-[playtest report](https://github.com/NouhKhouyi/SeekHunt/issues/new?template=playtest.yml).
-For code, see [CONTRIBUTING.md](CONTRIBUTING.md). Found a way to see someone
-you shouldn't? Please report it privately — see [SECURITY.md](SECURITY.md).
+## License
 
-## 📄 License
-
-[MIT](LICENSE). Map data © [OpenStreetMap](https://www.openstreetmap.org/copyright)
-contributors, tiles by [OpenFreeMap](https://openfreemap.org) and
-[OpenMapTiles](https://openmaptiles.org).
-
-<p align="center"><sub>Made in Valencia by <a href="https://github.com/NouhKhouyi">Nouh Khouyi</a>. Go outside. 🧡</sub></p>
+Released under the [MIT License](LICENSE). Map data ©
+[OpenStreetMap](https://www.openstreetmap.org/copyright) contributors; tiles by
+[OpenFreeMap](https://openfreemap.org) and [OpenMapTiles](https://openmaptiles.org).
