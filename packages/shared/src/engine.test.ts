@@ -205,4 +205,57 @@ describe("engine", () => {
     handle(s, id("ana"), { t: "loc", ...offset(center, 5000, 0), acc: 5 }, 1000);
     expect(distance(s.players[id("ana")]!.loc!, center)).toBeLessThan(1);
   });
+
+  it("locks out a seeker who keeps guessing catch codes", () => {
+    const s = startedGame();
+    tick(s, 60_000);
+    const real = s.players[id("ana")]!.catchCode!;
+    const wrong = real === "0000" ? "0001" : "0000";
+    for (let i = 0; i < 2; i++) {
+      expect(() => handle(s, id("seek"), { t: "catch", code: wrong }, 61_000)).toThrow("err.wrongCode");
+    }
+    // The third wrong guess earns a cooldown, and even the right code is refused during it.
+    expect(() => handle(s, id("seek"), { t: "catch", code: wrong }, 61_000)).toThrow("err.catchLocked");
+    expect(() => handle(s, id("seek"), { t: "catch", code: real }, 70_000)).toThrow("err.catchLocked");
+    handle(s, id("seek"), { t: "catch", code: real }, 92_000);
+    expect(s.players[id("ana")]!.status).toBe("caught");
+  });
+
+  it("refuses a catch when the seeker hides their own position but the hider's is known", () => {
+    const s = startedGame();
+    tick(s, 60_000);
+    handle(s, id("ana"), { t: "loc", ...center, acc: 5 }, 61_000);
+    const code = s.players[id("ana")]!.catchCode!;
+    expect(() => handle(s, id("seek"), { t: "catch", code }, 62_000)).toThrow("err.needLocation");
+    handle(s, id("seek"), { t: "loc", ...center, acc: 5 }, 62_000);
+    handle(s, id("seek"), { t: "catch", code }, 62_500);
+    expect(s.players[id("ana")]!.status).toBe("caught");
+  });
+
+  it("pause freezes the game and resume carries on where it stopped", () => {
+    const s = startedGame(["seek", "ana", "bea"], { pingIntervalSeconds: 60 });
+    handle(s, id("seek"), { t: "pause" }, 30_000);
+    expect(() => handle(s, id("ana"), { t: "pause" }, 30_000)).toThrow("err.hostOnly");
+    // Nothing moves while paused, however long it lasts.
+    expect(tick(s, 10 * 60_000)).toEqual([]);
+    expect(s.phase).toBe("hiding");
+    expect(viewFor(s, id("ana"), 10 * 60_000).pausedAt).toBe(30_000);
+    handle(s, id("seek"), { t: "resume" }, 10 * 60_000);
+    // 30 s of hiding were left when the pause started; they are still left now.
+    expect(s.seekStartAt).toBe(10 * 60_000 + 30_000);
+    expect(s.nextPingAt).toBe(s.seekStartAt! + 60_000);
+    tick(s, 10 * 60_000 + 29_000);
+    expect(s.phase).toBe("hiding");
+    tick(s, 10 * 60_000 + 30_000);
+    expect(s.phase).toBe("seeking");
+  });
+
+  it("records who caught whom and when, for the recap", () => {
+    const s = startedGame();
+    tick(s, 60_000);
+    handle(s, id("seek"), { t: "catch", code: s.players[id("ana")]!.catchCode! }, 75_000);
+    const ana = viewFor(s, id("bea"), 75_000).players.find((p) => p.id === id("ana"))!;
+    expect(ana.outAt).toBe(75_000);
+    expect(ana.caughtBy).toBe(id("seek"));
+  });
 });

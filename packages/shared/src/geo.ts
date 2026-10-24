@@ -51,3 +51,13 @@ export function circleRing(c: Circle, steps = 96): [number, number][] {
   }
   return ring;
 }
+
+/** Initial bearing from `a` to `b`, in degrees clockwise from north (0–360). */
+export function bearing(a: LatLng, b: LatLng): number {
+  const φ1 = toRad(a.lat);
+  const φ2 = toRad(b.lat);
+  const Δλ = toRad(b.lng - a.lng);
+  const y = Math.sin(Δλ) * Math.cos(φ2);
+  const x = Math.cos(φ1) * Math.sin(φ2) - Math.sin(φ1) * Math.cos(φ2) * Math.cos(Δλ);
+  return (toDeg(Math.atan2(y, x)) + 360) % 360;
+}

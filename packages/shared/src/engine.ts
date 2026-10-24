@@ -21,6 +21,10 @@ const FRESH_FIX_MS = 30_000;
 export const WALKING_SPEED_LIMIT = 7;
 /** Heads-up before each shrink starts. */
 const SHRINK_WARNING_MS = 30_000;
+/** Wrong catch codes allowed before a cooldown: stops a seeker trying all 10,000 codes. */
+export const CATCH_FREE_ATTEMPTS = 3;
+const CATCH_LOCK_BASE_MS = 30_000;
+const CATCH_LOCK_MAX_MS = 5 * 60_000;
 /** Altitude is only shared on the radar when the device claims at least this vertical accuracy (m). */
 export const TRUSTED_ALTITUDE_ACCURACY = 10;
 export const MIN_FLOOR = -5;
@@ -42,6 +46,12 @@ export interface PlayerState {
   speed?: number;
   /** Floor the player says they are on (building mode). */
   floor?: number | null;
+  /** When they were caught or eliminated, and by which seeker. */
+  outAt?: number | null;
+  caughtBy?: string | null;
+  /** Wrong catch codes in a row, and the cooldown they earned. */
+  catchFails?: number;
+  catchLockedUntil?: number;
 }
 
 export interface GameState {
@@ -64,6 +74,8 @@ export interface GameState {
   /** Highest shrink index already warned about (optional: rooms created before this field). */
   warnedStep?: number;
   hidersAtStart: number;
+  /** Host pause: everything time-based is frozen while set (optional: rooms saved before pausing existed). */
+  pausedAt?: number | null;
 }
 
 export class GameError extends Error {
@@ -207,8 +219,13 @@ export function handle(s: GameState, playerId: string, msg: ClientMsg, now: numb
         p.status = "active";
         p.outOfZoneSince = null;
         p.sosAt = null;
+        p.outAt = null;
+        p.caughtBy = null;
+        p.catchFails = 0;
+        p.catchLockedUntil = 0;
         p.catchCode = p.role === "hider" ? codes.pop()! : null;
       }
+      s.pausedAt = null;
       s.warnedStep = 0;
       s.seed = Math.floor(rand() * 2 ** 32);
       s.phase = "hiding";
@@ -251,16 +268,54 @@ export function handle(s: GameState, playerId: string, msg: ClientMsg, now: numb
 
     case "catch": {
       requirePhase(s, "seeking");
+      if (s.pausedAt) throw new GameError("err.paused");
       if (me.role !== "seeker" || me.status !== "active") throw new GameError("err.seekersOnly");
+      if ((me.catchLockedUntil ?? 0) > now) throw new GameError("err.catchLocked", { seconds: Math.ceil((me.catchLockedUntil! - now) / 1000) });
       const victim = activeHiders(s).find((p) => p.catchCode === String(msg.code).trim());
-      if (!victim) throw new GameError("err.wrongCode");
-      if (me.loc && now - me.loc.ts < FRESH_FIX_MS && (me.speed ?? 0) > WALKING_SPEED_LIMIT) throw new GameError("err.tooFast");
-      // Stops codes being passed around by message: both phones must roughly agree they're together.
-      if (me.loc && victim.loc && now - me.loc.ts < FRESH_FIX_MS && now - victim.loc.ts < FRESH_FIX_MS) {
-        const gap = distance(me.loc, victim.loc) - me.loc.acc - victim.loc.acc;
-        if (gap > CATCH_MAX_DISTANCE) throw new GameError("err.tooFar", { meters: Math.round(distance(me.loc, victim.loc)), name: victim.name });
+      if (!victim) {
+        // Guessing codes is the only way to catch someone without meeting them: make it slow.
+        me.catchFails = (me.catchFails ?? 0) + 1;
+        const over = me.catchFails - CATCH_FREE_ATTEMPTS;
+        if (over >= 0) {
+          me.catchLockedUntil = now + Math.min(CATCH_LOCK_MAX_MS, CATCH_LOCK_BASE_MS * 2 ** over);
+          throw new GameError("err.catchLocked", { seconds: Math.ceil((me.catchLockedUntil - now) / 1000) });
+        }
+        throw new GameError("err.wrongCode");
       }
-      return [...markCaught(s, victim, me), ...checkEnd(s, now)];
+      const myFresh = !!me.loc && now - me.loc.ts < FRESH_FIX_MS;
+      const victimFresh = !!victim.loc && now - victim.loc.ts < FRESH_FIX_MS;
+      if (myFresh && (me.speed ?? 0) > WALKING_SPEED_LIMIT) throw new GameError("err.tooFast");
+      // With the hider's position known, the seeker's must be too: switching GPS off can't skip the check below.
+      if (victimFresh && !myFresh) throw new GameError("err.needLocation");
+      // Stops codes being passed around by message: both phones must roughly agree they're together.
+      if (myFresh && victimFresh) {
+        const gap = distance(me.loc!, victim.loc!) - me.loc!.acc - victim.loc!.acc;
+        if (gap > CATCH_MAX_DISTANCE) throw new GameError("err.tooFar", { meters: Math.round(distance(me.loc!, victim.loc!)), name: victim.name });
+      }
+      me.catchFails = 0;
+      return [...markCaught(s, victim, me, now), ...checkEnd(s, now)];
+    }
+
+    case "pause":
+      requireHost(s, playerId);
+      requirePhase(s, "hiding", "seeking");
+      if (s.pausedAt) return [];
+      s.pausedAt = now;
+      return [ev("warn", "ev.paused")];
+
+    case "resume": {
+      requireHost(s, playerId);
+      requirePhase(s, "hiding", "seeking");
+      if (!s.pausedAt) return [];
+      // Shift every clock by the time spent paused, so the game carries on exactly where it stopped.
+      const d = now - s.pausedAt;
+      const shift = (t: number | null | undefined) => (t == null ? null : t + d);
+      s.startedAt = shift(s.startedAt);
+      s.seekStartAt = shift(s.seekStartAt);
+      s.nextPingAt = shift(s.nextPingAt);
+      for (const p of list(s)) p.outOfZoneSince = shift(p.outOfZoneSince);
+      s.pausedAt = null;
+      return [ev("warn", "ev.resumed")];
     }
 
     case "sos":
@@ -277,7 +332,7 @@ export function handle(s: GameState, playerId: string, msg: ClientMsg, now: numb
     case "surrender": {
       requirePhase(s, "hiding", "seeking");
       if (me.role !== "hider" || me.status !== "active") throw new GameError("err.notAllowed");
-      return [...markCaught(s, me, null), ...checkEnd(s, now)];
+      return [...markCaught(s, me, null, now), ...checkEnd(s, now)];
     }
 
     case "end":
@@ -292,19 +347,24 @@ export function handle(s: GameState, playerId: string, msg: ClientMsg, now: numb
       s.pings = [];
       s.winners = [];
       s.winReason = null;
+      s.pausedAt = null;
       for (const p of list(s)) {
         p.status = "active";
         p.catchCode = null;
         p.outOfZoneSince = null;
         p.sosAt = null;
+        p.outAt = null;
+        p.caughtBy = null;
       }
       return [ev("info", "ev.reset")];
   }
 }
 
-function markCaught(s: GameState, victim: PlayerState, by: PlayerState | null): GameEvent[] {
+function markCaught(s: GameState, victim: PlayerState, by: PlayerState | null, now: number): GameEvent[] {
   victim.status = "caught";
   victim.outOfZoneSince = null;
+  victim.outAt = now;
+  victim.caughtBy = by?.id ?? null;
   const infected = s.config.caughtBecomeSeekers;
   if (infected) {
     victim.role = "seeker";
@@ -321,6 +381,7 @@ function finish(s: GameState, now: number, winners: string[], reason: Msg): Game
   s.winners = winners;
   s.winReason = reason;
   s.nextPingAt = null;
+  s.pausedAt = null;
   return [{ kind: "end", msg: reason }];
 }
 
@@ -361,6 +422,7 @@ function pingFor(p: PlayerState, area: Circle, now: number, building: boolean): 
 /** Advances timers. Call every few seconds and after every message. */
 export function tick(s: GameState, now: number, rand: () => number = Math.random): GameEvent[] {
   const events: GameEvent[] = [];
+  if (s.pausedAt) return events;
   if (s.phase === "hiding" && s.seekStartAt !== null && now >= s.seekStartAt) {
     s.phase = "seeking";
     events.push(ev("warn", "ev.seekerOut"));
@@ -389,6 +451,7 @@ export function tick(s: GameState, now: number, rand: () => number = Math.random
     } else if (now - p.outOfZoneSince >= grace) {
       p.status = "eliminated";
       p.outOfZoneSince = null;
+      p.outAt = now;
       events.push(ev("elim", "ev.eliminated", { name: p.name }));
     }
   }
@@ -419,7 +482,17 @@ export function viewFor(s: GameState, viewerId: string, now: number): GameView {
   const staleMs = s.config.staleLocationSeconds * 1000;
 
   const players: PlayerView[] = list(s).map((p) => {
-    const v: PlayerView = { id: p.id, name: p.name, role: p.role, status: p.status, connected: p.connected, outOfZoneSince: p.outOfZoneSince, sos: !!p.sosAt };
+    const v: PlayerView = {
+      id: p.id,
+      name: p.name,
+      role: p.role,
+      status: p.status,
+      connected: p.connected,
+      outOfZoneSince: p.outOfZoneSince,
+      sos: !!p.sosAt,
+      outAt: p.outAt ?? null,
+      caughtBy: p.caughtBy ?? null,
+    };
     let because: PlayerView["visibleBecause"];
     if (p.id === viewerId) because = "self";
     else if (p.sosAt) because = "sos";
@@ -459,6 +532,7 @@ export function viewFor(s: GameState, viewerId: string, now: number): GameView {
     players,
     pings,
     nextPingAt: s.nextPingAt,
+    pausedAt: s.pausedAt ?? null,
     serverNow: now,
   };
 }
