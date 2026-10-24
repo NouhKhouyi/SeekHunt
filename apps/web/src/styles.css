@@ -525,3 +525,62 @@ body:has(.lobby) .toasts { top: calc(66px + var(--safe-t)); }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
+
+/* ─── Pause, big moments, way back, radar pulse, recap ─── */
+.map { transition: filter 0.4s; }
+.map.paused { filter: grayscale(1) contrast(0.92) brightness(1.03); }
+.hud-meta.way { align-items: center; gap: 8px; font-size: 0.95rem; }
+.hud-meta.way svg { flex: none; transition: transform 0.4s; }
+
+/* Full-screen beats: they never take a tap away from the game. */
+.moment {
+  position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; pointer-events: none; text-align: center;
+  padding: 0 var(--gutter-r) 0 var(--gutter-l);
+}
+.moment > div { display: flex; flex-direction: column; align-items: center; gap: 10px; animation: moment 2.6s cubic-bezier(0.2, 0.9, 0.3, 1) both; }
+.moment b.display { font-size: clamp(3rem, 15vw, 5.5rem); color: var(--ink); text-shadow: 0 2px 30px var(--canvas); }
+.moment span { font-weight: 650; color: var(--ink-2); background: var(--paper); padding: 6px 12px; border-radius: 999px; box-shadow: var(--shadow); }
+.moment.release { background: radial-gradient(circle at 50% 50%, rgb(255 87 20 / 0.42), transparent 62%); animation: flash 2.6s ease-out both; }
+.moment.release b.display { color: var(--blaze); }
+.moment.zone b.display { font-size: clamp(2.4rem, 11vw, 4.2rem); }
+.moment.countdown b { font-size: clamp(7rem, 40vw, 12rem); line-height: 1; color: var(--blaze); text-shadow: 0 4px 40px var(--canvas); animation: tick 1s cubic-bezier(0.2, 0.9, 0.3, 1) both; }
+@keyframes moment {
+  0% { opacity: 0; transform: scale(1.18); }
+  12% { opacity: 1; transform: scale(1); }
+  80% { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(0.96); }
+}
+@keyframes flash { 0% { opacity: 0; } 8% { opacity: 1; } 70% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes tick { 0% { opacity: 0; transform: scale(1.6); } 25% { opacity: 1; transform: scale(1); } 85% { opacity: 1; } 100% { opacity: 0; transform: scale(0.9); } }
+
+/* Sonar rings where a fresh radar found someone. */
+.ping-pulse { position: relative; width: 0; height: 0; pointer-events: none; }
+.ping-pulse i {
+  position: absolute; left: -22px; top: -22px; width: 44px; height: 44px; border-radius: 50%;
+  border: 2.5px solid var(--blaze); opacity: 0; animation: sonar 1.6s ease-out 2 both;
+}
+.ping-pulse.seeker i { border-color: var(--ink); }
+.ping-pulse i:nth-child(2) { animation-delay: 0.35s; }
+.ping-pulse i:nth-child(3) { animation-delay: 0.7s; }
+@keyframes sonar { 0% { transform: scale(0.3); opacity: 0.95; } 100% { transform: scale(4.2); opacity: 0; } }
+
+/* Recap */
+.sheet.ended { max-height: min(74vh, 720px); overflow-y: auto; overscroll-behavior: contain; }
+.stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 8px 0 2px; }
+.stats div { background: var(--fill); border-radius: 14px; padding: 10px 12px; display: flex; flex-direction: column-reverse; gap: 2px; }
+.stats dt { font-size: 0.75rem; font-weight: 600; color: var(--ink-3); }
+.stats dd { margin: 0; font-size: 1.6rem; line-height: 1.05; }
+.results .disclosure { margin-top: 8px; font-size: 0.95rem; }
+.timeline { list-style: none; margin: 0; padding: 0 0 0 4px; display: flex; flex-direction: column; }
+.timeline li { position: relative; display: grid; grid-template-columns: 52px 1fr; gap: 10px; padding: 6px 0 6px 16px; font-size: 0.9rem; color: var(--ink-2); }
+.timeline li::before { content: ""; position: absolute; left: 0; top: 13px; width: 8px; height: 8px; border-radius: 50%; background: var(--ink-3); }
+.timeline li::after { content: ""; position: absolute; left: 3.5px; top: 23px; bottom: -7px; width: 1px; background: var(--line); }
+.timeline li:last-child::after { display: none; }
+.timeline li.catch::before { background: var(--blaze); }
+.timeline li.elim::before { background: var(--danger); }
+.timeline li.catch span:last-child { color: var(--ink); font-weight: 600; }
+.timeline .num { color: var(--ink-3); font-weight: 600; }
+.results-actions { display: flex; gap: 8px; margin-top: 10px; }
+.results-actions .btn { flex: 1; }
+/* A soft pool of the page colour behind big words, so street labels never read through them. */
+.moment.zone, .moment.countdown { background: radial-gradient(circle at 50% 50%, color-mix(in srgb, var(--canvas) 78%, transparent) 0, transparent 58%); }

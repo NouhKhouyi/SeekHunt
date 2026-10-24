@@ -18,6 +18,8 @@ export interface MapPing {
   area: Circle;
   label: string;
   kind: "seeker" | "hider";
+  /** When the radar fired: a new value plays the pulse animation once. */
+  at?: number;
 }
 
 interface Props {
@@ -33,6 +35,10 @@ interface Props {
   refitKey?: string | number;
   /** Where the (collapsed) OSM attribution sits, away from floating UI. */
   attribution?: "top-right" | "bottom-left" | "bottom-right";
+  /** The zone is closing right now: its edge pulses. */
+  shrinking?: boolean;
+  /** The game is paused: the map goes grey. */
+  paused?: boolean;
   onTap?: (p: LatLng) => void;
 }
 
@@ -42,6 +48,7 @@ export interface MapHandle {
 }
 
 const DARK = matchMedia("(prefers-color-scheme: dark)").matches;
+const REDUCED_MOTION = matchMedia("(prefers-reduced-motion: reduce)").matches;
 const STYLE = `https://tiles.openfreemap.org/styles/${DARK ? "dark" : "positron"}`;
 
 // MapLibre v6 looks for its worker next to its own module; once bundled that file isn't there,
@@ -83,6 +90,26 @@ const outsideMask = (c: Circle): Feature => ({
   },
 });
 
+/**
+ * Diagonal hazard stripes for everything outside the zone. Lines every 8 px on a 16 px tile with
+ * slope 1 tile seamlessly, so the pattern reads as one continuous surface.
+ */
+function hazardImage(color: string) {
+  const size = 16;
+  const canvas = document.createElement("canvas");
+  canvas.width = canvas.height = size;
+  const g = canvas.getContext("2d")!;
+  g.strokeStyle = color;
+  g.lineWidth = 2.5;
+  g.beginPath();
+  for (let o = -size; o <= size * 2; o += 8) {
+    g.moveTo(o, size);
+    g.lineTo(o + size, 0);
+  }
+  g.stroke();
+  return g.getImageData(0, 0, size, size);
+}
+
 function boundsOf(c: Circle) {
   const ring = circleRing(c, 16);
   return ring.reduce((b, p) => b.extend(p), new maplibregl.LngLatBounds(ring[0], ring[0]));
@@ -100,7 +127,7 @@ function markerEl(p: MapPlayer): HTMLElement {
   return el;
 }
 
-export const GameMap = forwardRef<MapHandle, Props>(function GameMap({ zone, nextZone, pings = [], players = [], focus, padding, refitKey, attribution = "bottom-right", onTap }, ref) {
+export const GameMap = forwardRef<MapHandle, Props>(function GameMap({ zone, nextZone, pings = [], players = [], focus, padding, refitKey, attribution = "bottom-right", shrinking = false, paused = false, onTap }, ref) {
   const el = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
   const markers = useRef(new Map<string, { marker: maplibregl.Marker; kind: string }>());
@@ -178,6 +205,8 @@ export const GameMap = forwardRef<MapHandle, Props>(function GameMap({ zone, nex
     map.on("load", () => {
       for (const id of ["mask", "zone", "next", "pings", "ping-points"]) map.addSource(id, { type: "geojson", data: empty });
       map.addLayer({ id: "mask", type: "fill", source: "mask", paint: { "fill-color": C.mask, "fill-opacity": C.maskOpacity } });
+      map.addImage("hazard", hazardImage(C.zone), { pixelRatio: 2 });
+      map.addLayer({ id: "mask-hatch", type: "fill", source: "mask", paint: { "fill-pattern": "hazard", "fill-opacity": DARK ? 0.22 : 0.16 } });
       map.addLayer({ id: "zone-fill", type: "fill", source: "zone", paint: { "fill-color": C.zone, "fill-opacity": 0.04 } });
       map.addLayer({ id: "zone-line", type: "line", source: "zone", paint: { "line-color": C.zone, "line-width": 3 } });
       map.addLayer({ id: "next-line", type: "line", source: "next", paint: { "line-color": C.next, "line-width": 2, "line-dasharray": [2, 1.5] } });
@@ -211,6 +240,48 @@ export const GameMap = forwardRef<MapHandle, Props>(function GameMap({ zone, nex
 
   useEffect(renderShapes, [zone, nextZone, pings]);
 
+  // While the zone closes, its edge thickens and breathes, so the moment is felt even at a glance.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !ready.current || !map.getLayer("zone-line")) return;
+    map.setPaintProperty("zone-line", "line-width", shrinking ? 5 : 3);
+    if (!shrinking || REDUCED_MOTION) {
+      map.setPaintProperty("zone-line", "line-opacity", 1);
+      return;
+    }
+    let on = false;
+    const timer = setInterval(() => {
+      on = !on;
+      if (map.getLayer("zone-line")) map.setPaintProperty("zone-line", "line-opacity", on ? 0.35 : 1);
+    }, 650);
+    return () => {
+      clearInterval(timer);
+      if (map.getLayer("zone-line")) map.setPaintProperty("zone-line", "line-opacity", 1);
+    };
+  }, [shrinking, mapReady]);
+
+  // A fresh radar plays a sonar pulse on every circle it reveals. Pings already on screen when the
+  // map opens (a reload) stay still.
+  const pingKey = pings.map((p) => p.at ?? 0).join(",");
+  const seenPings = useRef(pingKey);
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || pingKey === seenPings.current) return;
+    seenPings.current = pingKey;
+    if (REDUCED_MOTION) return;
+    const pulses = data.current.pings.map((p) => {
+      const el = document.createElement("div");
+      el.className = `ping-pulse ${p.kind}`;
+      el.innerHTML = "<i></i><i></i><i></i>";
+      return new maplibregl.Marker({ element: el }).setLngLat([p.area.center.lng, p.area.center.lat]).addTo(map);
+    });
+    const timer = setTimeout(() => pulses.forEach((m) => m.remove()), 3200);
+    return () => {
+      clearTimeout(timer);
+      pulses.forEach((m) => m.remove());
+    };
+  }, [pingKey]);
+
   // Players are DOM markers (initials avatars), diffed by id so they glide instead of blinking.
   useEffect(() => {
     const map = mapRef.current;
@@ -241,5 +312,5 @@ export const GameMap = forwardRef<MapHandle, Props>(function GameMap({ zone, nex
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focusKey]);
 
-  return <div ref={el} className="map" />;
+  return <div ref={el} className={`map${paused ? " paused" : ""}`} />;
 });

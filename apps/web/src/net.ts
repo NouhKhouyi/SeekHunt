@@ -61,6 +61,13 @@ export async function roomExists(code: string): Promise<boolean> {
 
 export type Toast = Omit<GameEvent, "to"> & { id: number };
 
+/**
+ * Events the game screen already shows in a bigger way: the full-screen moments for the release and
+ * the zone closing, and the red banner while outside the zone. They still sound and vibrate, but a
+ * toast on top would only repeat the same words and cover the map.
+ */
+const SHOWN_ON_SCREEN = new Set(["ev.seekerOut", "ev.zoneClosing", "ev.outOfZone"]);
+
 export interface Connection {
   view: GameView | null;
   status: "connecting" | "open" | "closed";
@@ -107,9 +114,10 @@ export function useRoom(code: string, name: string): Connection {
         } else if (msg.t === "error") {
           setError(msg.error);
         } else if (msg.t === "event") {
+          cue(msg.event.kind);
+          if (SHOWN_ON_SCREEN.has(msg.event.msg.key)) return;
           const id = ++toastId.current;
           setToasts((t) => [...t.slice(-3), { ...msg.event, id }]);
-          cue(msg.event.kind);
           setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), msg.event.kind === "info" ? 3500 : 6000);
         }
       };

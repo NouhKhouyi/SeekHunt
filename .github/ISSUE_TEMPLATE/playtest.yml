@@ -1,0 +1,27 @@
+name: Playtest report
+description: You played a real game. Tell us how it went.
+title: "[playtest] "
+labels: ["playtest"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        The most useful feedback this project can get. Thank you for playing!
+  - type: input
+    id: setup
+    attributes:
+      label: The game
+      placeholder: "6 players, 1 seeker, 400 m zone, Classic pace, park + streets"
+    validations:
+      required: true
+  - type: textarea
+    id: fun
+    attributes:
+      label: What was fun, and what wasn't?
+    validations:
+      required: true
+  - type: textarea
+    id: problems
+    attributes:
+      label: Problems
+      description: GPS, battery, disconnections, rules that felt unfair, confusing screens…

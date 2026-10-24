@@ -39,6 +39,10 @@ export interface PlayerView {
   sos?: boolean;
   /** Declared floor (building mode), shown alongside a visible position. */
   floor?: number | null;
+  /** When the player was caught or eliminated (ms epoch), for the end-of-game recap. */
+  outAt?: number | null;
+  /** Id of the seeker who caught them, when it was a catch. */
+  caughtBy?: string | null;
 }
 
 export interface Ping {
@@ -68,6 +72,8 @@ export interface GameView {
   players: PlayerView[];
   pings: Ping[];
   nextPingAt: number | null;
+  /** Set while the host has paused the game: clocks, zone and radar are frozen at this instant. */
+  pausedAt: number | null;
   serverNow: number;
 }
 
@@ -83,6 +89,8 @@ export type ClientMsg =
   | { t: "surrender" }
   | { t: "sos" }
   | { t: "sosClear" }
+  | { t: "pause" }
+  | { t: "resume" }
   | { t: "end" }
   | { t: "reset" };
 

@@ -1,0 +1,16 @@
+name: Idea
+description: A mechanic, a mode or an improvement.
+title: "[idea] "
+labels: ["idea"]
+body:
+  - type: textarea
+    id: idea
+    attributes:
+      label: The idea
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: What would it make better?
+      description: More fun, fairer, safer, easier to start a game…

@@ -1,6 +1,25 @@
 {
   "name": "seekhunt",
+  "version": "1.0.0",
   "private": true,
+  "description": "Real-life hide and seek with a battle-royale zone that closes in. A web app for your phone, no install needed.",
+  "license": "MIT",
+  "author": "Nouh Khouyi",
+  "homepage": "https://seekhunt.nouhk.workers.dev",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/NouhKhouyi/SeekHunt.git"
+  },
+  "keywords": [
+    "hide-and-seek",
+    "gps",
+    "game",
+    "battle-royale",
+    "pwa",
+    "cloudflare-workers",
+    "durable-objects",
+    "maplibre"
+  ],
   "type": "module",
   "workspaces": [
     "packages/*",

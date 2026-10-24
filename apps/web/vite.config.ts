@@ -15,8 +15,8 @@ export default defineConfig(({ mode }) => ({
       manifest: {
         name: "SeekHunt",
         short_name: "SeekHunt",
-        description: "Escondite por GPS con una zona que se cierra.",
-        lang: "es",
+        // The interface follows the phone's language, so the manifest stays bilingual.
+        description: "Real-life hide and seek with a closing zone · Escondite real con una zona que se cierra.",
         start_url: "/",
         display: "standalone",
         orientation: "portrait",
