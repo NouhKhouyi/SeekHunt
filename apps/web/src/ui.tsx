@@ -20,6 +20,14 @@ export function fmt(ms: number): string {
   return `${m}:${String(s % 60).padStart(2, "0")}`;
 }
 
+/** A game length for people: "47 min", "1 h 05 min", or seconds for very short rounds. */
+export function fmtDuration(ms: number): string {
+  const total = Math.max(0, Math.round(ms / 1000));
+  if (total < 60) return `${total} s`;
+  const m = Math.round(total / 60);
+  return m < 60 ? `${m} min` : `${Math.floor(m / 60)} h ${String(m % 60).padStart(2, "0")} min`;
+}
+
 export const initials = (name: string) =>
   name
     .split(" ")

@@ -303,6 +303,8 @@ export function Lobby({ view, send, gps, onLeave }: Props) {
               </li>
             ))}
           </ul>
+          {/* Balance matters most in big groups: too many seekers ends it in minutes, too few drags on. */}
+          {view.players.length >= 6 && seekers > 0 && (hiders / seekers < 3 || hiders / seekers > 7) && <p className="faint small">{t("lobby.balance")}</p>}
         </div>
 
         <div className="block">

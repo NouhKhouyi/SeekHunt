@@ -1,0 +1,99 @@
+<!doctype html>
+<!-- Dev-only page used by scripts/og-image.mjs to render link-preview images. Not part of the build. -->
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <style>
+      html, body { margin: 0; background: #0c0d0f; }
+      #card {
+        position: relative; overflow: hidden; background: #0c0d0f; color: #f1f2f4;
+        font-family: "Archivo Variable", system-ui, sans-serif;
+      }
+      #card > svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+      .copy { position: absolute; z-index: 2; left: 7%; top: 0; bottom: 0; width: 52%; display: flex; flex-direction: column; justify-content: center; gap: 22px; }
+      .brand { display: flex; align-items: center; gap: 14px; font-weight: 800; font-stretch: 72%; font-size: 30px; letter-spacing: 0.04em; }
+      .brand svg { width: 36px; height: 36px; flex: none; }
+      h1 { margin: 0; font-weight: 800; font-stretch: 72%; text-transform: uppercase; line-height: 0.9; letter-spacing: -0.01em; font-size: 96px; }
+      h1 em { font-style: normal; color: #ff6a2c; }
+      p { margin: 0; font-size: 25px; line-height: 1.35; color: #a9aeb7; max-width: 30ch; }
+      .url { font-size: 20px; font-weight: 700; font-stretch: 72%; letter-spacing: 0.06em; color: #6c727c; text-transform: uppercase; }
+    </style>
+  </head>
+  <body>
+    <div id="card">
+      <svg id="art"></svg>
+      <div class="copy">
+        <div class="brand">
+          <svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="13" fill="none" stroke="#f1f2f4" stroke-width="3" /><circle cx="19.5" cy="12.5" r="5" fill="#ff6a2c" /></svg>
+          SEEKHUNT
+        </div>
+        <h1>Hide.<br /><em>The zone<br />is closing.</em></h1>
+        <p>Real-life hide and seek on your phone. One seeker, a zone that shrinks every few minutes, one survivor.</p>
+        <div class="url">Play free · no install</div>
+      </div>
+    </div>
+    <script type="module">
+      import "@fontsource-variable/archivo/wdth.css";
+      import { HERO_SIZE, HERO_ZONES } from "/src/heroGeometry.ts";
+
+      const params = new URLSearchParams(location.search);
+      const W = Number(params.get("w") ?? 1200);
+      const H = Number(params.get("h") ?? 630);
+      const card = document.getElementById("card");
+      card.style.width = `${W}px`;
+      card.style.height = `${H}px`;
+
+      // Place the real map so the first zone sits on the right, filling most of the height.
+      const outer = HERO_ZONES[0];
+      const scale = (H * 0.46) / outer.r;
+      const cx = W * 0.72;
+      const cy = H * 0.5;
+      const tx = cx - outer.x * scale;
+      const ty = cy - outer.y * scale;
+      const svg = document.getElementById("art");
+      svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+      const ns = "http://www.w3.org/2000/svg";
+      const el = (name, attrs) => {
+        const node = document.createElementNS(ns, name);
+        for (const [k, v] of Object.entries(attrs)) node.setAttribute(k, v);
+        return node;
+      };
+      const defs = el("defs", {});
+      const pattern = el("pattern", { id: "hatch", width: 18, height: 18, patternUnits: "userSpaceOnUse", patternTransform: "rotate(-45)" });
+      pattern.append(el("rect", { width: 5, height: 18, fill: "rgba(255,106,44,0.11)" }));
+      const mask = el("mask", { id: "outside" });
+      mask.append(el("rect", { width: W, height: H, fill: "#fff" }));
+      const last = HERO_ZONES.at(-1);
+      mask.append(el("circle", { cx: outer.x * scale + tx, cy: outer.y * scale + ty, r: outer.r * scale, fill: "#000" }));
+      const fade = el("linearGradient", { id: "fade", x1: 0, x2: 1, y1: 0, y2: 0 });
+      fade.append(el("stop", { offset: "0.30", "stop-color": "#0c0d0f", "stop-opacity": 1 }));
+      fade.append(el("stop", { offset: "0.62", "stop-color": "#0c0d0f", "stop-opacity": 0 }));
+      defs.append(pattern, mask, fade);
+      svg.append(defs);
+      svg.append(el("image", { href: "/hero-dark.webp", x: tx, y: ty, width: HERO_SIZE.w * scale, height: HERO_SIZE.h * scale }));
+      svg.append(el("rect", { width: W, height: H, fill: "rgba(0,0,0,0.45)", mask: "url(#outside)" }));
+      svg.append(el("rect", { width: W, height: H, fill: "url(#hatch)", mask: "url(#outside)" }));
+      // The game as it plays out: the first zone, the dashed steps, the final circle and the survivor.
+      HERO_ZONES.forEach((z, i) => {
+        const isFirst = i === 0;
+        const isLast = i === HERO_ZONES.length - 1;
+        if (!isFirst && !isLast && i !== 2) return;
+        svg.append(
+          el("circle", {
+            cx: z.x * scale + tx,
+            cy: z.y * scale + ty,
+            r: z.r * scale,
+            fill: isLast ? "rgba(255,106,44,0.3)" : "none",
+            stroke: isFirst || isLast ? "#ff6a2c" : "#f1f2f4",
+            "stroke-width": isFirst ? 5 : isLast ? 3 : 2,
+            "stroke-dasharray": isFirst || isLast ? "" : "10 8",
+            opacity: isFirst || isLast ? 1 : 0.8,
+          }),
+        );
+      });
+      svg.append(el("circle", { cx: last.x * scale + tx, cy: last.y * scale + ty, r: 10, fill: "#ff6a2c", stroke: "#0c0d0f", "stroke-width": 3 }));
+      svg.append(el("rect", { width: W, height: H, fill: "url(#fade)" }));
+      document.fonts.ready.then(() => requestAnimationFrame(() => (window.__ready = true)));
+    </script>
+  </body>
+</html>
