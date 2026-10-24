@@ -1,0 +1,38 @@
+name: Bug report
+description: Something in the app or the game doesn't work.
+title: "[bug] "
+labels: ["bug"]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What you did, what you expected and what you got instead.
+    validations:
+      required: true
+  - type: input
+    id: device
+    attributes:
+      label: Phone and browser
+      placeholder: "iPhone 15, Safari 26 / Pixel 9, Chrome 140"
+    validations:
+      required: true
+  - type: dropdown
+    id: phase
+    attributes:
+      label: When?
+      options:
+        - Home / joining a room
+        - Lobby
+        - Hiding
+        - Seeking
+        - Catching (QR or code)
+        - Results
+        - Something else
+    validations:
+      required: true
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else?
+      description: Screenshots help a lot. Please don't share other players' positions.

@@ -1,100 +1,156 @@
-# SeekHunt: diseño del juego
+# SeekHunt: game design
 
-Escondite / pilla-pilla en la vida real con una zona que se va cerrando, al estilo battle royale.
+*[Leer en español](GAME_DESIGN.es.md)*
 
-## Bucle de juego
+Real-life hide and seek, or tag, with a play zone that keeps closing in, battle-royale style.
 
-1. **Lobby**: el anfitrión crea una sala (código de 5 letras), comparte el enlace y dibuja la zona (centro y radio) en el mapa. Asigna roles: por defecto, quien crea es el cazador.
-2. **Escondite** (`hideSeconds`): los escondidos tienen ventaja y el cazador espera en el punto de salida.
-3. **Búsqueda**: la zona se cierra `shrinkCount` veces, una cada `shrinkIntervalSeconds`. Cada cierre se anima durante `shrinkDurationSeconds`.
-   - La **próxima zona** se ve siempre en el mapa (círculo blanco discontinuo), así que se puede planificar la ruta.
-   - Cada nueva zona cabe entera dentro de la anterior. El centro es aleatorio y sale de una semilla, así que el servidor y los clientes calculan lo mismo.
-4. **Fin**:
-   - Si el cazador pilla a todos, ganan los cazadores.
-   - Con `lastSurvivorWins`, gana el último escondido que quede.
-   - Si se acaba el tiempo (último cierre + `finalHoldSeconds`), ganan todos los supervivientes.
+## The game loop
 
-## Cómo se pilla a alguien
+1. **Lobby.** The host creates a room (a 5-letter code), shares the link and
+   sets the zone (centre and radius) on the map. Whoever creates the room seeks
+   by default; the host can swap roles.
+2. **Hiding** (`hideSeconds`). The hiders get a head start while the seeker
+   waits at the start. The last three seconds count down on every screen.
+3. **Seeking.** The seeker is released, and the zone closes `shrinkCount`
+   times, once every `shrinkIntervalSeconds`. Each shrink animates over
+   `shrinkDurationSeconds`.
+   - The **next zone** is always on the map as a dashed circle, so players can
+     plan their route.
+   - Every new zone fits entirely inside the previous one. Its centre is random
+     but comes from a seed, so the server and every phone compute the same
+     circles.
+4. **The end.**
+   - If the seekers catch everyone, the seekers win.
+   - With `lastSurvivorWins`, the last hider standing wins.
+   - If time runs out (the last shrink plus `finalHoldSeconds`), every survivor
+     wins.
+   - Everyone gets a recap: how long it lasted, who caught whom and when, and a
+     result card to share.
 
-Solo con el GPS no se puede decidir una captura: falla entre 5 y 20 m, y más entre edificios. Por eso la captura combina tres comprobaciones:
+## Catching someone
 
-1. **Contacto real.** El cazador toca al escondido. Esto lo valida el grupo, como en el pilla-pilla de siempre.
-2. **QR del escondido.** El escondido lleva en la pantalla un QR con `SEEKHUNT:<sala>:<código>`, y el cazador lo escanea desde la app.
-   - En Android se usa el lector nativo (BarcodeDetector).
-   - En iPhone se usa zxing-wasm, servido desde nuestro propio servidor.
-   - Si el QR es de otra partida, se rechaza.
-   - Si la cámara falla, el cazador puede escribir las 4 cifras que aparecen debajo del QR.
-3. **Comprobación del servidor.** Si los dos móviles tienen una posición reciente (menos de 30 s), el servidor exige que estén a menos de 80 m más la precisión de cada GPS. Así no sirve pasarse el código por WhatsApp. También rechaza la captura si el cazador va a más de 25 km/h.
+GPS alone can't decide a catch: it is off by 5–20 m, and more between
+buildings. So a catch combines three checks:
 
-Si nada de esto funciona, el escondido pulsa **"Me han pillado"**.
+1. **Real contact.** The seeker tags the hider. The group keeps this honest,
+   like playground tag.
+2. **The hider's QR.** The hider's screen shows a QR code containing
+   `SEEKHUNT:<room>:<code>`, and the seeker scans it in the app.
+   - Android uses the native `BarcodeDetector`.
+   - iPhone uses zxing-wasm, served from our own origin.
+   - A QR from another game is rejected.
+   - If the camera fails, the seeker can type the 4 digits shown under the QR.
+3. **The server's check.**
+   - If the hider's position is recent (under 30 s), the seeker's must be too.
+     Turning your own GPS off doesn't skip the check.
+   - When both are recent, the phones must be within 80 m of each other, plus
+     each GPS's own error. Sending your code over WhatsApp doesn't work.
+   - A seeker moving faster than 25 km/h can't catch.
+   - **Guessing codes doesn't work either.** After three wrong codes in a row,
+     the seeker has to wait 30 s, then 60 s, 120 s and so on, up to 5 minutes.
+     Trying all 10,000 codes would take days.
 
-## Precisión del radar y edificios
+If nothing else works, the hider taps **"I've been caught"**.
 
-**Lo que se puede afinar:**
-- La precisión del radar va de "Exacta" a ±300 m.
-- En "Exacta" el círculo es solo el error que el propio GPS declara. No se puede ir más allá: un móvil falla unos 5 m a cielo abierto, entre 10 y 20 m entre edificios y entre 30 y 100 m en interior.
+## Host pause
 
-**Plantas.** Una web no puede saber de forma fiable en qué planta está alguien:
-- La altitud del GPS tiene más error que la posición horizontal, y dentro de un edificio casi nunca llega.
-- El barómetro, que sí lo resolvería, no está disponible para las webs.
+The host can pause at any moment during hiding or seeking. Clocks, the zone,
+the radar and the out-of-zone countdowns all freeze, and nobody can be caught.
+On resume, every timer is shifted by the length of the pause, so the game
+carries on exactly where it stopped. It is for traffic lights, a friend's
+untied shoe, or anything that matters more than the game.
 
-**Modo edificio (`buildingMode`).**
-- Cada jugador indica su planta con un selector (−5 a 200) y el radar la muestra junto al nombre: "Ana, planta 3".
-- Es una regla de honor, igual que tocar para pillar.
-- Si los dos móviles miden la altitud con un error de ±10 m o menos, el radar añade la diferencia ("9 m más arriba") como comprobación.
-- Si en algún momento se empaqueta como app nativa (Capacitor), el barómetro permitiría detectar las plantas solo.
+## Radar precision and buildings
 
-## Idiomas
+**What can be tuned:**
+- Radar precision goes from "Exact" to ±300 m.
+- On "Exact", the circle is only the error the GPS itself reports. Nothing is
+  more precise than that: a phone is off by about 5 m under open sky, 10–20 m
+  between buildings and 30–100 m indoors.
 
-La interfaz está en español e inglés, y se elige automáticamente según el idioma del móvil (se puede cambiar con el selector ES/EN). El servidor nunca envía frases: envía claves con parámetros (`ev.caughtBy {by, name}`), y cada móvil las muestra en su idioma. Así, en una misma partida cada jugador ve los avisos en el suyo. Los textos están en `apps/web/src/i18n.ts`.
+**Floors.** A website can't reliably tell which floor someone is on:
+- GPS altitude is less accurate than the horizontal position, and indoors it
+  rarely arrives at all.
+- The barometer, which would solve it, isn't available to websites.
 
-## Mecánicas para equilibrar
+**Building mode (`buildingMode`).**
+- Each player sets their floor with a picker (−5 to 200), and the radar shows
+  it next to their name: "Ana, floor 3".
+- It is an honour rule, like tagging.
+- When both phones measure altitude to ±10 m or better, the radar adds the
+  difference ("9 m above") as a cross-check.
+- If the game is ever wrapped as a native app (Capacitor), the barometer could
+  detect floors automatically.
 
-| Mecánica | Por qué existe |
+## Languages
+
+The interface is in English and Spanish, picked automatically from the phone's
+language and switchable with the EN/ES toggle. The server never sends
+sentences: it sends message keys with parameters (`ev.caughtBy {by, name}`),
+and each phone shows them in its own language, so players in the same game can
+each read the alerts in theirs. The strings live in `apps/web/src/i18n.ts`.
+
+## Balancing mechanics
+
+| Mechanic | Why it exists |
 |---|---|
-| **Aviso 30 s antes de cada cierre** | Suena y vibra para que nadie se quede fuera por despiste. |
-| **Fuera de zona** | Quien sale de la zona queda **revelado** al cazador y tiene `outOfZoneGraceSeconds` para volver. Si no vuelve, queda eliminado. |
-| **Radar** cada `pingIntervalSeconds` | El cazador ve un círculo aproximado (±`pingFuzzMeters`) de cada escondido, y los escondidos ven la posición exacta del cazador. Así ninguno de los dos bandos va a ciegas. |
-| **Señal perdida** | A quien deja de enviar ubicación durante `staleLocationSeconds`, el cazador lo ve en su última posición conocida. Así nadie gana nada apagando el GPS. |
-| **Modo infección** (`caughtBecomeSeekers`) | Los pillados pasan a ser cazadores. Funciona bien en grupos grandes. |
-| **Saltos imposibles** | Se descartan las posiciones que implican más de 60 m/s. Es un antitrampas ligero contra GPS falso. |
+| **Warning 30 s before each shrink** | A sound and a vibration, so nobody is caught outside by accident. |
+| **Big moments** | A countdown before the release, a full-screen "The seeker is out!", and a banner every time the zone starts to close. |
+| **Out of zone** | A hider outside the zone is **revealed** to the seeker and has `outOfZoneGraceSeconds` to get back in; an arrow and the distance point the way. Otherwise they are eliminated. |
+| **Radar** every `pingIntervalSeconds` | The seeker sees a rough circle (±`pingFuzzMeters`) for each hider, and the hiders see the seekers' exact position, so neither side plays blind. Fresh circles pulse like sonar. |
+| **Lost signal** | Anyone who stops sending their location for `staleLocationSeconds` is shown to the seeker at their last known position, so switching GPS off gains nothing. |
+| **Infection mode** (`caughtBecomeSeekers`) | Caught players become seekers. Great for big groups. |
+| **Impossible jumps** | Positions implying more than 60 m/s are discarded: a light defence against fake GPS. |
+| **Team balance tip** | In groups of 6 or more, the lobby suggests 1 seeker for every 4–6 hiders. |
 
-## Seguridad y privacidad (requisitos, no extras)
+## Safety and privacy (requirements, not extras)
 
-- Las zonas se eligen sin carreteras grandes, vías de tren, agua ni propiedades privadas. La pantalla de inicio lo recuerda.
-- La ubicación solo se comparte mientras hay una partida abierta, y la sala se borra tras 12 h sin actividad.
-- Cada jugador recibe una **vista personalizada**: el servidor nunca envía a un cliente posiciones que no debe ver, así que tampoco se pueden sacar del inspector del navegador.
-- **Consentimiento antes de pedir la ubicación.** Al entrar en una sala por primera vez se explica:
-  - qué se comparte, con quién y cuándo;
-  - que no se guarda historial y que la sala se borra a las 12 h;
-  - que hay que tener 14 años o más, o permiso de un tutor;
-  - las normas de la calle.
+- Zones should avoid big roads, railways, water and private property. The home
+  screen says so.
+- Location is only shared while a game is open, and a room is deleted after 12
+  hours without activity.
+- Every player gets a **personalised view**: the server never sends a phone a
+  position it isn't allowed to see, so it can't be pulled out of the browser's
+  developer tools either.
+- **Consent before asking for location.** The first time someone enters a
+  room, the app explains:
+  - what is shared, with whom and when;
+  - that no history is kept and the room is deleted after 12 hours;
+  - that players must be 14 or older, or have a guardian's permission;
+  - the street rules.
 
-  El GPS no se activa hasta aceptar. Esto sigue el RGPD y la LOPDGDD; la AEPD ya sancionó a LaLiga por no informar al activar el sensor.
-- **SOS.** Cualquier jugador puede pedir ayuda: todos reciben un aviso con sonido y vibración y ven su posición exacta hasta que pulse "Estoy bien". La app recuerda que en una emergencia hay que llamar al 112.
-- **Se juega a pie.** Por encima de 25 km/h la app avisa y no deja pillar.
-- Pendiente: una pausa global del anfitrión y un punto de encuentro al terminar.
+  GPS isn't switched on until they agree. This follows the GDPR and Spain's
+  LOPDGDD; Spain's data protection authority has fined LaLiga for switching a
+  sensor on without telling users.
+- **SOS.** Any player can ask for help: everyone gets an alert with sound and
+  vibration and sees their exact position until they tap "I'm OK". The app
+  reminds them to call 112 in an emergency.
+- **On foot only.** Above 25 km/h the app warns the player and refuses catches.
+- **Host pause** stops everything at once.
 
-## Hoja de ruta (según la investigación de la competencia)
+## Roadmap (from competitor research)
 
-Los rivales (Gottcha, Zone Hunt, Manhunt, Hunting Zone) reciben quejas sobre todo por **batería, desconexiones y lag**. Lo que les funciona es la **información que se gana o se gasta** y las **habilidades con cooldown**.
+Competitors (Gottcha, Zone Hunt, Manhunt, Hunting Zone) get complaints mostly
+about **battery, disconnections and lag**. What works for them is
+**information you earn or spend** and **abilities with cooldowns**.
 
-| Prioridad | Idea |
+| Priority | Idea |
 |---|---|
-| Alta | Preguntas automáticas al estilo Jet Lag que responde el servidor con el GPS, sin que el escondido haga nada: "¿Estás a menos de 500 m?", "¿Más cerca que yo del punto X?" |
-| Alta | Pausa global del anfitrión, que congela relojes y zona. |
-| Media | Habilidades con cargas: señuelo (radar falso), silencio (te saltas un radar) para el escondido; ping extra y termómetro para el cazador. |
-| Media | Remontada: radar más frecuente cuando quedan pocos escondidos, y fases finales más lentas (la lección de PUBG). |
-| Media | Recomendar 1 cazador por cada 4–6 escondidos y un radio según el tamaño del grupo. |
-| Baja | Resumen final con el recorrido de cada jugador, solo en local y borrado al salir. |
-| Baja | Zonas con forma de polígono y zonas prohibidas dibujables (vías, autovías, ríos). |
-| Baja | App nativa con Capacitor, para tener ubicación con la pantalla bloqueada. |
+| High | Automatic Jet Lag–style questions answered by the server from GPS, with no effort from the hider: "Are you within 500 m?", "Are you closer than me to point X?" |
+| Medium | Abilities with charges: decoy (a fake radar circle) and silence (skip one radar) for hiders; extra ping and a hot/cold meter for seekers. |
+| Medium | Comeback mechanics: more frequent radar when few hiders are left, and slower final phases (the PUBG lesson). |
+| Low | A route replay for each player in the recap, kept only on the phone and deleted on leaving. |
+| Low | Polygon zones and drawable no-go areas (railways, motorways, rivers). |
+| Low | A native app with Capacitor, for location with the screen locked. |
 
-## Limitación técnica clave: GPS con la pantalla apagada
+## The key technical limit: GPS with the screen off
 
-En iOS, una web/PWA **no recibe ubicación con la pantalla bloqueada**, y en Android también es poco fiable. La v1 lo resuelve así:
-- usa Wake Lock para mantener la pantalla encendida;
-- avisa en la interfaz de que hay que mantener la pantalla encendida;
-- revela al jugador si su posición se queda antigua.
+On iOS a website or PWA **gets no location while the screen is locked**, and
+on Android it is unreliable too. Version 1 deals with it like this:
 
-Si al probarlo resulta un problema, el siguiente paso es empaquetarla con **Capacitor** y un plugin de ubicación en segundo plano, reutilizando todo el código web.
+- it keeps the screen on with the Wake Lock API;
+- the interface reminds players to keep the screen on;
+- a player whose position goes stale is revealed.
+
+If that proves to be a problem in practice, the next step is wrapping the app
+with **Capacitor** and a background location plugin, reusing all the web code.
