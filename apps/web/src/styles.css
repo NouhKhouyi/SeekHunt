@@ -580,7 +580,7 @@ body:has(.lobby) .toasts { top: calc(66px + var(--safe-t)); }
 .timeline li.elim::before { background: var(--danger); }
 .timeline li.catch span:last-child { color: var(--ink); font-weight: 600; }
 .timeline .num { color: var(--ink-3); font-weight: 600; }
-.results-actions { display: flex; gap: 8px; margin-top: 10px; }
+.results-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
 .results-actions .btn { flex: 1; }
 /* A soft pool of the page colour behind big words, so street labels never read through them. */
 .moment.zone, .moment.countdown { background: radial-gradient(circle at 50% 50%, color-mix(in srgb, var(--canvas) 78%, transparent) 0, transparent 58%); }

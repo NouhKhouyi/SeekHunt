@@ -84,8 +84,8 @@ untied shoe, or anything that matters more than the game.
 
 ## Languages
 
-The interface is in English and Spanish, picked automatically from the phone's
-language and switchable with the EN/ES toggle. The server never sends
+The interface is in English, Spanish and German, picked automatically from the phone's
+language and switchable with the EN/ES/DE selector. The server never sends
 sentences: it sends message keys with parameters (`ev.caughtBy {by, name}`),
 and each phone shows them in its own language, so players in the same game can
 each read the alerts in theirs. The strings live in `apps/web/src/i18n.ts`.
