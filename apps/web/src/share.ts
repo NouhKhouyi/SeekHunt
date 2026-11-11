@@ -1,5 +1,5 @@
 import { buildSchedule, type Circle, type GameView } from "@seekhunt/shared";
-import { translate, translateMsg } from "./i18n";
+import { type Lang, translate, translateMsg } from "./i18n";
 import { fmtDuration, initials } from "./ui";
 
 /**
@@ -34,7 +34,7 @@ function fitText(g: Ctx, text: string, weight: number, size: number, max: number
   return s;
 }
 
-export async function renderResultCard(view: GameView, lang: "es" | "en"): Promise<Blob> {
+export async function renderResultCard(view: GameView, lang: Lang): Promise<Blob> {
   const t = (key: string, params?: Record<string, string | number>) => translate(key, params, lang);
   await Promise.allSettled([document.fonts.load(`800 120px ${FONT}`), document.fonts.load(`600 36px ${FONT}`)]);
 
@@ -187,7 +187,7 @@ export async function renderResultCard(view: GameView, lang: "es" | "en"): Promi
 }
 
 /** Shares the card through the phone's share sheet, or downloads it where sharing files isn't possible. */
-export async function shareResult(view: GameView, lang: "es" | "en"): Promise<"shared" | "saved" | "cancelled"> {
+export async function shareResult(view: GameView, lang: Lang): Promise<"shared" | "saved" | "cancelled"> {
   const blob = await renderResultCard(view, lang);
   const file = new File([blob], `seekhunt-${view.code.toLowerCase()}.png`, { type: "image/png" });
   const text = translate("results.shareText", {}, lang);

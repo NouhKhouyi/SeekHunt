@@ -62,7 +62,7 @@ comparte el enlace. No hay que instalar nada ni crear una cuenta.
   cierre y la dirección y distancia para volver a la zona.
 - **Resumen.** Duración, capturas, supervivientes, cronología e imagen del
   resultado.
-- **Idiomas.** Español e inglés, según el móvil.
+- **Idiomas.** Español, inglés y alemán, según el móvil.
 
 <p align="center">
   <img src="docs/assets/screen-release.webp" width="180" alt="Sale el cazador">

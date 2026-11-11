@@ -63,7 +63,7 @@ the link. There is nothing to install and no account to create.
   closes, and a direction and distance back to the zone for anyone outside it.
 - **Recap.** Duration, catches, survivors, a timeline of the game and a
   shareable result image.
-- **Languages.** English and Spanish, chosen per device.
+- **Languages.** English, Spanish and German, chosen per device.
 
 <p align="center">
   <img src="docs/assets/screen-release.webp" width="180" alt="The seeker is released">

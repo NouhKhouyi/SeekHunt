@@ -237,17 +237,18 @@ export function GameProgress({ config, elapsed }: { config: GameConfig; elapsed:
   );
 }
 
-/** ES / EN switch. The choice is per device and remembered. */
+/** Language switch. The choice is per device and remembered. */
 export function LangToggle() {
   const t = useT();
-  const options: { value: Lang; label: string }[] = [
-    { value: "es", label: "ES" },
-    { value: "en", label: "EN" },
+  const options: { value: Lang; label: string; name: string }[] = [
+    { value: "es", label: "ES", name: "Español" },
+    { value: "en", label: "EN", name: "English" },
+    { value: "de", label: "DE", name: "Deutsch" },
   ];
   return (
     <div className="lang" role="group" aria-label={t("lang.label")}>
       {options.map((o) => (
-        <button key={o.value} type="button" lang={o.value} aria-pressed={t.lang === o.value} onClick={() => setLang(o.value)}>
+        <button key={o.value} type="button" lang={o.value} aria-label={o.name} title={o.name} aria-pressed={t.lang === o.value} onClick={() => setLang(o.value)}>
           {o.label}
         </button>
       ))}
