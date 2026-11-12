@@ -87,10 +87,10 @@ El botón empieza desactivado y muestra un borde naranja cuando está activo.
 El botón controla tanto la visibilidad como la edición: al desactivarlo se ocultan
 las marcas propias y del equipo solo para ese jugador, sin borrarlas. Un contador
 muestra todas las marcas disponibles y desaparece cuando no queda ninguna. Si
-un compañero añade una marca mientras están ocultas, el botón parpadea suavemente
-hasta mostrarlas o hasta que esas marcas nuevas se eliminen o caduquen. Editar una
-marca existente no activa el aviso. Los espectadores pueden mostrar las marcas de
-su equipo, pero no editarlas. Escape también desactiva el botón. En simulación,
+un compañero añade una marca o cambia su icono o posición mientras están ocultas,
+el botón parpadea suavemente hasta mostrarlas o hasta que esas marcas se eliminen
+o caduquen. Los espectadores pueden mostrar las marcas de su equipo, pero no
+editarlas. Escape también desactiva el botón. En simulación,
 los toques mueven al jugador mientras esté desactivado.
 Las pausas o dejar de jugar activamente también lo desactivan.
 

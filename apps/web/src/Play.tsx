@@ -73,19 +73,25 @@ export function Play({ view, send, gps, clockOffset, ask }: Props) {
     : [];
   const mapMarks = marksVisible ? availableMarks : [];
   const [unseenTeamMarks, setUnseenTeamMarks] = useState<Set<string>>(() => new Set());
-  const previousMarks = useRef({ role: me.role, playerId: me.id, ids: new Set(availableMarks.map((mark) => mark.id)) });
-  const hasNewTeamMarks = !marksVisible && availableMarks.some((mark) => unseenTeamMarks.has(mark.id));
+  const previousMarks = useRef({ role: me.role, playerId: me.id, marks: new Map(availableMarks.map((mark) => [mark.id, mark])) });
+  const hasUnseenTeamMarks = !marksVisible && availableMarks.some((mark) => unseenTeamMarks.has(mark.id));
 
   useEffect(() => {
     const previous = previousMarks.current;
-    previousMarks.current = { role: me.role, playerId: me.id, ids: new Set(availableMarks.map((mark) => mark.id)) };
+    previousMarks.current = { role: me.role, playerId: me.id, marks: new Map(availableMarks.map((mark) => [mark.id, mark])) };
     setUnseenTeamMarks((current) => {
       // Opening the flags acknowledges them. A team change starts a fresh notification history.
       if (marksVisible || previous.role !== me.role || previous.playerId !== me.id) {
         return current.size ? new Set() : current;
       }
       const unseen = new Set(availableMarks
-        .filter((mark) => mark.playerId !== me.id && (current.has(mark.id) || !previous.ids.has(mark.id)))
+        .filter((mark) => {
+          const before = previous.marks.get(mark.id);
+          // Compare the content: resuming a pause shifts expiry times without editing any flag.
+          const changed = !before || before.kind !== mark.kind
+            || before.pos.lat !== mark.pos.lat || before.pos.lng !== mark.pos.lng;
+          return mark.playerId !== me.id && (current.has(mark.id) || changed);
+        })
         .map((mark) => mark.id));
       // Removed or expired marks stop requesting attention, even if older flags remain.
       return unseen.size === current.size && [...unseen].every((id) => current.has(id)) ? current : unseen;
@@ -304,7 +310,7 @@ export function Play({ view, send, gps, clockOffset, ask }: Props) {
         </button>
         {markings && (
           <button
-            className={`icon-btn mark-toggle${hasNewTeamMarks ? " has-new-marks" : ""}`}
+            className={`icon-btn mark-toggle${hasUnseenTeamMarks ? " has-new-marks" : ""}`}
             aria-label={t("fab.mark")}
             aria-describedby="map-mark-count"
             title={t("fab.mark")}
