@@ -548,7 +548,8 @@ body:has(.lobby) .toasts { top: calc(66px + var(--safe-t)); }
 .scanner:has(.scanner-type) .scanner-top .label { color: var(--ink-3); }
 .icon-btn.sos { color: var(--danger-text); }
 .icon-btn.mark-toggle { position: relative; }
-.mark-count {
+.mark-toggle[data-count]::after {
+  content: attr(data-count); font-variant-numeric: tabular-nums;
   position: absolute; top: -6px; right: -6px; display: grid; place-items: center;
   min-width: 21px; height: 21px; padding: 0 4px; border: 2px solid var(--paper); border-radius: 999px;
   background: var(--blaze); color: var(--on-blaze); font-size: 11px; line-height: 1; pointer-events: none;

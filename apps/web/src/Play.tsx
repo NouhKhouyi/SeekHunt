@@ -141,6 +141,7 @@ export function Play({ view, send, gps, clockOffset, ask }: Props) {
         own={selectedMark?.playerId === me.id}
         canEdit={markEditMode}
         limit={ownMarkCount >= config.mapMarkLimit}
+        maxMarks={config.mapMarkLimit}
         now={now}
         onClose={() => setMarkSelection(null)}
         onKind={(kind) => {
@@ -311,16 +312,15 @@ export function Play({ view, send, gps, clockOffset, ask }: Props) {
         {markings && (
           <button
             className={`icon-btn mark-toggle${hasUnseenTeamMarks ? " has-new-marks" : ""}`}
-            aria-label={t("fab.mark")}
-            aria-describedby="map-mark-count"
+            // The badge is drawn by CSS from data-count; the name announces the same number.
+            data-count={availableMarks.length || undefined}
+            aria-label={availableMarks.length > 0 ? `${t("fab.mark")} (${t("fab.markCount", { n: availableMarks.length })})` : t("fab.mark")}
             title={t("fab.mark")}
             aria-pressed={marksVisible}
             disabled={paused}
             onClick={() => { setMarksVisible(!marksVisible); setMarkSelection(null); setMovingMark(null); }}
           >
             <Flag size={20} />
-            {availableMarks.length > 0 && <span className="mark-count num" aria-hidden>{availableMarks.length}</span>}
-            <span id="map-mark-count" className="sr-only">{t("fab.markCount", { n: availableMarks.length })}</span>
           </button>
         )}
         {!ended && !mySos && (
@@ -448,6 +448,7 @@ interface MarkMenuProps {
   own: boolean;
   canEdit: boolean;
   limit: boolean;
+  maxMarks: number;
   now: number;
   onClose: () => void;
   onKind: (kind: MapMarkKind) => void;
@@ -455,7 +456,7 @@ interface MarkMenuProps {
   onMove: () => void;
 }
 
-function MarkMenu({ mark, owner, own, canEdit, limit, now, onClose, onKind, onRemove, onMove }: MarkMenuProps) {
+function MarkMenu({ mark, owner, own, canEdit, limit, maxMarks, now, onClose, onKind, onRemove, onMove }: MarkMenuProps) {
   const t = useT();
   const editable = canEdit && (!mark || own);
   return <div className="mark-menu" role="dialog" aria-label={t("mark.title")} onKeyDown={(e) => {
@@ -475,7 +476,7 @@ function MarkMenu({ mark, owner, own, canEdit, limit, now, onClose, onKind, onRe
       <p className="mark-author">{t("mark.by", { name: owner })}</p>
       <p className="small muted">{t("mark.remaining", { time: fmt(mark.expiresAt - now) })}</p>
     </> : <p className="small muted">{t("mark.newHint")}</p>}
-    {!mark && limit ? <p className="small">{t("mark.limitHint")}</p> : editable && <div className="mark-options">
+    {!mark && limit ? <p className="small">{t("mark.limitHint", { n: maxMarks })}</p> : editable && <div className="mark-options">
       <button
         className="btn btn-soft mark-sighted-option"
         aria-pressed={mark?.kind === "suspect"}
