@@ -10,7 +10,6 @@ import type { ClientMsg, EventKind, Fix, GameEvent, GameView, Msg, Phase, Ping, 
 import { buildSchedule, gameDeadline, zoneAt } from "./zones";
 
 export const MAX_PLAYERS = 30;
-export const MAX_MAP_MARKS = 3;
 export const MAP_MARK_TTL_MS = 2 * 60_000;
 /** Fixes implying a faster speed than this (m/s) within a short window are discarded as glitches/spoofing. */
 const MAX_PLAUSIBLE_SPEED = 60;
@@ -284,7 +283,7 @@ export function handle(s: GameState, playerId: string, msg: ClientMsg, now: numb
     case "markUpdate":
     case "markRemove": {
       requirePhase(s, "hiding", "seeking");
-      if (s.config.mapMarkLimit <= 0 || me.status !== "active") throw new GameError("err.notAllowed");
+      if (!(s.config.mapMarkLimit > 0) || me.status !== "active") throw new GameError("err.notAllowed");
       if (s.pausedAt !== null && s.pausedAt !== undefined) throw new GameError("err.paused");
       expireMapMarks(s, now);
       const marks = s.mapMarks ??= [];

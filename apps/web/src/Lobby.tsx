@@ -359,7 +359,7 @@ export function Lobby({ view, send, gps, onLeave }: Props) {
                 <select
                   id="opt-marks"
                   disabled={!isHost}
-                  value={cfg.mapMarkLimit}
+                  value={cfg.mapMarkLimit ?? 0}
                   onChange={(e) => setConfig({ mapMarkLimit: Number(e.target.value) })}
                 >
                   <option value={0}>{t("rule.mapMarkingsOff")}</option>

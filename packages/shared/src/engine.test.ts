@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_CONFIG, effectiveFinalRadius, sanitizeConfig } from "./config";
+import { DEFAULT_CONFIG, effectiveFinalRadius, MAX_MAP_MARKS, sanitizeConfig } from "./config";
 import { distance, offset } from "./geo";
-import { createGame, handle, hello, MAX_MAP_MARKS, MAP_MARK_TTL_MS, tick, viewFor } from "./engine";
+import { createGame, handle, hello, MAP_MARK_TTL_MS, tick, viewFor } from "./engine";
 import type { ClientMsg } from "./protocol";
 import { mulberry32 } from "./rng";
 import { buildSchedule, zoneAt } from "./zones";
@@ -197,21 +197,14 @@ function startedGame(players = ["seek", "ana", "bea"], overrides = {}) {
 }
 
 describe("config", () => {
-  it("migrates former marking settings and prefers the current mapMarkLimit", () => {
-    const oldLimit = { ...DEFAULT_CONFIG, teamMarkLimit: 2 };
-    delete (oldLimit as Partial<typeof oldLimit>).mapMarkLimit;
-    const migrated = sanitizeConfig(oldLimit, DEFAULT_CONFIG);
-    expect(migrated.mapMarkLimit).toBe(2);
-    expect(migrated).not.toHaveProperty("teamMarkLimit");
-    expect(sanitizeConfig({ mapMarkLimit: 1 }, oldLimit).mapMarkLimit).toBe(1);
-    expect(sanitizeConfig({ mapMarkLimit: 0 }, oldLimit).mapMarkLimit).toBe(0);
-    expect(sanitizeConfig({}, oldLimit).mapMarkLimit).toBe(2);
-
-    for (const enabled of [true, false]) {
-      const oldSwitch = { ...DEFAULT_CONFIG, teamMarkings: enabled };
-      delete (oldSwitch as Partial<typeof oldSwitch>).mapMarkLimit;
-      expect(sanitizeConfig(oldSwitch, DEFAULT_CONFIG).mapMarkLimit).toBe(enabled ? 3 : 0);
-    }
+  it("clamps the map marking limit and keeps it off for rooms saved without it", () => {
+    expect(sanitizeConfig({ mapMarkLimit: 2.4 }, DEFAULT_CONFIG).mapMarkLimit).toBe(2);
+    expect(sanitizeConfig({ mapMarkLimit: 99 }, DEFAULT_CONFIG).mapMarkLimit).toBe(MAX_MAP_MARKS);
+    expect(sanitizeConfig({ mapMarkLimit: -1 }, DEFAULT_CONFIG).mapMarkLimit).toBe(0);
+    expect(sanitizeConfig({ mapMarkLimit: NaN }, { ...DEFAULT_CONFIG, mapMarkLimit: 2 }).mapMarkLimit).toBe(2);
+    const legacy = { ...DEFAULT_CONFIG } as Partial<typeof DEFAULT_CONFIG>;
+    delete legacy.mapMarkLimit;
+    expect(sanitizeConfig({}, legacy as typeof DEFAULT_CONFIG).mapMarkLimit).toBe(0);
   });
 
   it("accepts exact radii down to 25 m and keeps the chosen final radius", () => {

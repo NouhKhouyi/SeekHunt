@@ -8,7 +8,6 @@ import {
   type GameState,
   handle,
   hello,
-  sanitizeConfig,
   type ServerMsg,
   tick,
   viewFor,
@@ -74,15 +73,6 @@ export class GameRoom extends DurableObject<Env> {
     super(ctx, env);
     ctx.blockConcurrencyWhile(async () => {
       this.game = (await ctx.storage.get<GameState>("game")) ?? null;
-      if (this.game) {
-        this.game.config = sanitizeConfig(this.game.config, this.game.config);
-        // Keep rooms written by builds that used the former teamMarks field readable.
-        const legacyGame = this.game as GameState & {
-          teamMarks?: GameState["mapMarks"];
-        };
-        this.game.mapMarks ??= legacyGame.teamMarks ?? [];
-        delete legacyGame.teamMarks;
-      }
       this.lastActivity = (await ctx.storage.get<number>("lastActivity")) ?? Date.now();
     });
   }

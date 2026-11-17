@@ -55,6 +55,8 @@ const clamp = (v: unknown, min: number, max: number, fallback: number) =>
   typeof v === "number" && Number.isFinite(v) ? Math.min(max, Math.max(min, v)) : fallback;
 
 export const MIN_ZONE_RADIUS = 25;
+/** Most map markings one player can have at once (`mapMarkLimit` ranges 0–this). */
+export const MAX_MAP_MARKS = 3;
 export const MAX_ZONE_RADIUS = 20_000;
 
 /** The last zone is never more than half the first one, so even a tiny play area still closes in. */
@@ -62,18 +64,9 @@ export function effectiveFinalRadius(config: GameConfig): number {
   return Math.max(5, Math.min(config.finalRadius, config.zone.radius / 2));
 }
 
-/** Accept former persisted field names while emitting only the current config format. */
-function readMapMarkLimit(config: Partial<GameConfig> & { teamMarkLimit?: unknown; teamMarkings?: unknown }): number | undefined {
-  const limit = config.mapMarkLimit ?? config.teamMarkLimit;
-  if (typeof limit === "number" && Number.isFinite(limit)) return Math.round(clamp(limit, 0, 3, 0));
-  if (typeof config.teamMarkings === "boolean") return config.teamMarkings ? 3 : 0;
-  return undefined;
-}
-
 /** Merges an untrusted partial config onto `base`, clamping every value to a sane range. */
 export function sanitizeConfig(input: Partial<GameConfig> | undefined, base: GameConfig): GameConfig {
   const i = input ?? {};
-  const mapMarkLimit = readMapMarkLimit(i) ?? readMapMarkLimit(base) ?? 0;
   const zoneIn = i.zone;
   const zone: Circle =
     zoneIn && zoneIn.center
@@ -104,6 +97,7 @@ export function sanitizeConfig(input: Partial<GameConfig> | undefined, base: Gam
     lastSurvivorWins: typeof i.lastSurvivorWins === "boolean" ? i.lastSurvivorWins : base.lastSurvivorWins,
     // `?? false`: rooms saved before this option existed have no value for it.
     buildingMode: typeof i.buildingMode === "boolean" ? i.buildingMode : (base.buildingMode ?? false),
-    mapMarkLimit,
+    // `?? 0`: rooms saved before this option existed have no value for it.
+    mapMarkLimit: Math.round(clamp(i.mapMarkLimit, 0, MAX_MAP_MARKS, base.mapMarkLimit ?? 0)),
   };
 }
