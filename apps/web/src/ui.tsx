@@ -248,7 +248,7 @@ export function LangToggle() {
   return (
     <div className="lang" role="group" aria-label={t("lang.label")}>
       {options.map((o) => (
-        <button key={o.value} type="button" lang={o.value} aria-label={o.name} title={o.name} aria-pressed={t.lang === o.value} onClick={() => setLang(o.value)}>
+        <button key={o.value} type="button" lang={o.value} title={o.name} aria-pressed={t.lang === o.value} onClick={() => setLang(o.value)}>
           {o.label}
         </button>
       ))}
