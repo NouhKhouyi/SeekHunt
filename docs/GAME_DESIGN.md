@@ -82,6 +82,16 @@ untied shoe, or anything that matters more than the game.
 - If the game is ever wrapped as a native app (Capacitor), the barometer could
   detect floors automatically.
 
+**Map markings (`mapMarkLimit`).** Off by default; the host allows 1–3 per player.
+- During hiding and seeking, an active player taps the map to drop a note:
+  "opponent sighted" or "nobody found".
+- Only the player's own team ever receives the note, spectators included. It
+  shows who placed it and disappears after 2 minutes; editing or moving it
+  restarts the countdown, and a pause freezes it.
+- Only the author can change or remove a note. In infection mode a caught
+  player's notes are deleted, so nothing crosses over to the seekers.
+- Notes are cleared when the game ends.
+
 ## Map markings (`mapMarkLimit`)
 
 An optional lobby rule, disabled by default. Choose 0–3 marks per player; 0

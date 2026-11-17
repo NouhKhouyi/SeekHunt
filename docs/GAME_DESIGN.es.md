@@ -55,6 +55,12 @@ El anfitrión puede pausar en cualquier momento del escondite o la búsqueda. Se
 - Si los dos móviles miden la altitud con un error de ±10 m o menos, el radar añade la diferencia ("9 m más arriba") como comprobación.
 - Si en algún momento se empaqueta como app nativa (Capacitor), el barómetro permitiría detectar las plantas solo.
 
+**Marcas del mapa (`mapMarkLimit`).** Desactivadas por defecto; el anfitrión permite de 1 a 3 por jugador.
+- Durante el escondite y la búsqueda, un jugador activo toca el mapa para dejar una nota: "rival avistado" o "nadie encontrado".
+- Solo la recibe su propio equipo, espectadores incluidos. Muestra quién la puso y desaparece a los 2 minutos; editarla o moverla reinicia la cuenta atrás, y la pausa la congela.
+- Solo su autor puede cambiarla o borrarla. En modo infección, las notas de quien es pillado se borran, así que nada pasa al equipo cazador.
+- Las notas se borran al acabar la partida.
+
 ## Idiomas
 
 La interfaz está en español, inglés y alemán, y se elige automáticamente según el idioma del móvil (se puede cambiar con el selector ES/EN/DE). El servidor nunca envía frases: envía claves con parámetros (`ev.caughtBy {by, name}`), y cada móvil las muestra en su idioma. Así, en una misma partida cada jugador ve los avisos en el suyo. Los textos están en `apps/web/src/i18n.ts`.
