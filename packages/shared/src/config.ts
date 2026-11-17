@@ -29,6 +29,8 @@ export interface GameConfig {
   lastSurvivorWins: boolean;
   /** Players declare which floor they are on, and the radar shows it. For games inside buildings. */
   buildingMode: boolean;
+  /** Temporary map notes available to each player; 0 disables them. */
+  mapMarkLimit: number;
 }
 
 export const DEFAULT_CONFIG: GameConfig = {
@@ -46,12 +48,15 @@ export const DEFAULT_CONFIG: GameConfig = {
   caughtBecomeSeekers: false,
   lastSurvivorWins: true,
   buildingMode: false,
+  mapMarkLimit: 0,
 };
 
 const clamp = (v: unknown, min: number, max: number, fallback: number) =>
   typeof v === "number" && Number.isFinite(v) ? Math.min(max, Math.max(min, v)) : fallback;
 
 export const MIN_ZONE_RADIUS = 25;
+/** Most map markings one player can have at once (`mapMarkLimit` ranges 0–this). */
+export const MAX_MAP_MARKS = 3;
 export const MAX_ZONE_RADIUS = 20_000;
 
 /** The last zone is never more than half the first one, so even a tiny play area still closes in. */
@@ -92,5 +97,7 @@ export function sanitizeConfig(input: Partial<GameConfig> | undefined, base: Gam
     lastSurvivorWins: typeof i.lastSurvivorWins === "boolean" ? i.lastSurvivorWins : base.lastSurvivorWins,
     // `?? false`: rooms saved before this option existed have no value for it.
     buildingMode: typeof i.buildingMode === "boolean" ? i.buildingMode : (base.buildingMode ?? false),
+    // `?? 0`: rooms saved before this option existed have no value for it.
+    mapMarkLimit: Math.round(clamp(i.mapMarkLimit, 0, MAX_MAP_MARKS, base.mapMarkLimit ?? 0)),
   };
 }

@@ -6,10 +6,11 @@
  */
 import { DEFAULT_CONFIG, type GameConfig, sanitizeConfig } from "./config";
 import { distance, randomPointInCircle, type Circle } from "./geo";
-import type { ClientMsg, EventKind, Fix, GameEvent, GameView, Msg, Phase, Ping, PlayerStatus, PlayerView, Role } from "./protocol";
+import type { ClientMsg, EventKind, Fix, GameEvent, GameView, Msg, Phase, Ping, PlayerStatus, PlayerView, Role, MapMark } from "./protocol";
 import { buildSchedule, gameDeadline, zoneAt } from "./zones";
 
 export const MAX_PLAYERS = 30;
+export const MAP_MARK_TTL_MS = 2 * 60_000;
 /** Fixes implying a faster speed than this (m/s) within a short window are discarded as glitches/spoofing. */
 const MAX_PLAUSIBLE_SPEED = 60;
 /** Accuracy slack (m) granted before declaring someone out of the zone. */
@@ -69,6 +70,9 @@ export interface GameState {
   /** Players in join order, for stable lists. */
   order: string[];
   pings: Ping[];
+  /** Optional for rooms persisted before map markings existed. */
+  mapMarks?: MapMark[];
+  nextMarkId?: number;
   nextPingAt: number | null;
   announcedStep: number;
   /** Highest shrink index already warned about (optional: rooms created before this field). */
@@ -107,6 +111,7 @@ export function createGame(code: string, config: GameConfig = DEFAULT_CONFIG): G
     players: {},
     order: [],
     pings: [],
+    mapMarks: [],
     nextPingAt: null,
     announcedStep: 0,
     hidersAtStart: 0,
@@ -174,6 +179,13 @@ function catchCodes(count: number, rand: () => number): string[] {
 }
 
 const finite = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v);
+const validMarkKind = (v: unknown) => v === "suspect" || v === "clear";
+const validMarkPosition = (lat: unknown, lng: unknown) =>
+  finite(lat) && finite(lng) && Math.abs(lat) <= 85 && Math.abs(lng) <= 180;
+
+function expireMapMarks(s: GameState, now: number) {
+  if (s.mapMarks?.length) s.mapMarks = s.mapMarks.filter((m) => m.expiresAt > now);
+}
 
 export function handle(s: GameState, playerId: string, msg: ClientMsg, now: number, rand: () => number = Math.random): GameEvent[] {
   const me = s.players[playerId];
@@ -235,6 +247,7 @@ export function handle(s: GameState, playerId: string, msg: ClientMsg, now: numb
       s.winners = [];
       s.winReason = null;
       s.pings = [];
+      s.mapMarks = [];
       s.announcedStep = 0;
       s.hidersAtStart = hiders.length;
       s.nextPingAt = s.config.pingIntervalSeconds > 0 ? s.seekStartAt + s.config.pingIntervalSeconds * 1000 : null;
@@ -266,9 +279,57 @@ export function handle(s: GameState, playerId: string, msg: ClientMsg, now: numb
       return [];
     }
 
+    case "markAdd":
+    case "markUpdate":
+    case "markRemove": {
+      requirePhase(s, "hiding", "seeking");
+      if (!(s.config.mapMarkLimit > 0) || me.status !== "active") throw new GameError("err.notAllowed");
+      if (s.pausedAt !== null && s.pausedAt !== undefined) throw new GameError("err.paused");
+      expireMapMarks(s, now);
+      const marks = s.mapMarks ??= [];
+      if (msg.t === "markAdd") {
+        if (!validMarkKind(msg.kind) || !validMarkPosition(msg.lat, msg.lng)) {
+          throw new GameError("err.invalidMark");
+        }
+        const ownMarks = marks.filter((mark) => mark.playerId === playerId);
+        if (ownMarks.length >= s.config.mapMarkLimit) {
+          throw new GameError("err.markLimit", { n: s.config.mapMarkLimit });
+        }
+        s.nextMarkId = (s.nextMarkId ?? 0) + 1;
+        marks.push({
+          id: String(s.nextMarkId),
+          playerId,
+          role: me.role,
+          pos: { lat: msg.lat, lng: msg.lng },
+          kind: msg.kind,
+          expiresAt: now + MAP_MARK_TTL_MS,
+        });
+      } else {
+        const mark = marks.find((m) => m.id === msg.id && m.playerId === playerId && m.role === me.role);
+        // Use one error for missing, expired and other players' marks so this lookup reveals nothing.
+        if (!mark) throw new GameError("err.markUnavailable");
+        if (msg.t === "markRemove") {
+          s.mapMarks = marks.filter((m) => m !== mark);
+        } else {
+          const hasPosition = msg.lat !== undefined || msg.lng !== undefined;
+          const hasKind = msg.kind !== undefined;
+          const invalidKind = hasKind && !validMarkKind(msg.kind);
+          const invalidPosition = hasPosition && !validMarkPosition(msg.lat, msg.lng);
+          if ((!hasKind && !hasPosition) || invalidKind || invalidPosition) {
+            throw new GameError("err.invalidMark");
+          }
+          if (msg.kind !== undefined) mark.kind = msg.kind;
+          if (hasPosition) mark.pos = { lat: msg.lat!, lng: msg.lng! };
+          mark.expiresAt = now + MAP_MARK_TTL_MS;
+        }
+      }
+      // State updates reach clients through their filtered views; mark data is never a public event.
+      return [];
+    }
+
     case "catch": {
       requirePhase(s, "seeking");
-      if (s.pausedAt) throw new GameError("err.paused");
+      if (s.pausedAt != null) throw new GameError("err.paused");
       if (me.role !== "seeker" || me.status !== "active") throw new GameError("err.seekersOnly");
       if ((me.catchLockedUntil ?? 0) > now) throw new GameError("err.catchLocked", { seconds: Math.ceil((me.catchLockedUntil! - now) / 1000) });
       const victim = activeHiders(s).find((p) => p.catchCode === String(msg.code).trim());
@@ -299,14 +360,14 @@ export function handle(s: GameState, playerId: string, msg: ClientMsg, now: numb
     case "pause":
       requireHost(s, playerId);
       requirePhase(s, "hiding", "seeking");
-      if (s.pausedAt) return [];
+      if (s.pausedAt != null) return [];
       s.pausedAt = now;
       return [ev("warn", "ev.paused")];
 
     case "resume": {
       requireHost(s, playerId);
       requirePhase(s, "hiding", "seeking");
-      if (!s.pausedAt) return [];
+      if (s.pausedAt == null) return [];
       // Shift every clock by the time spent paused, so the game carries on exactly where it stopped.
       const d = now - s.pausedAt;
       const shift = (t: number | null | undefined) => (t == null ? null : t + d);
@@ -314,6 +375,7 @@ export function handle(s: GameState, playerId: string, msg: ClientMsg, now: numb
       s.seekStartAt = shift(s.seekStartAt);
       s.nextPingAt = shift(s.nextPingAt);
       for (const p of list(s)) p.outOfZoneSince = shift(p.outOfZoneSince);
+      for (const mark of s.mapMarks ?? []) mark.expiresAt += d;
       s.pausedAt = null;
       return [ev("warn", "ev.resumed")];
     }
@@ -345,6 +407,7 @@ export function handle(s: GameState, playerId: string, msg: ClientMsg, now: numb
       requirePhase(s, "ended");
       s.phase = "lobby";
       s.pings = [];
+      s.mapMarks = [];
       s.winners = [];
       s.winReason = null;
       s.pausedAt = null;
@@ -367,6 +430,7 @@ function markCaught(s: GameState, victim: PlayerState, by: PlayerState | null, n
   victim.caughtBy = by?.id ?? null;
   const infected = s.config.caughtBecomeSeekers;
   if (infected) {
+    s.mapMarks = (s.mapMarks ?? []).filter((m) => m.playerId !== victim.id);
     victim.role = "seeker";
     victim.status = "active";
     victim.catchCode = null;
@@ -376,6 +440,7 @@ function markCaught(s: GameState, victim: PlayerState, by: PlayerState | null, n
 }
 
 function finish(s: GameState, now: number, winners: string[], reason: Msg): GameEvent[] {
+  s.mapMarks = [];
   s.phase = "ended";
   s.endedAt = now;
   s.winners = winners;
@@ -422,7 +487,9 @@ function pingFor(p: PlayerState, area: Circle, now: number, building: boolean): 
 /** Advances timers. Call every few seconds and after every message. */
 export function tick(s: GameState, now: number, rand: () => number = Math.random): GameEvent[] {
   const events: GameEvent[] = [];
-  if (s.pausedAt) return events;
+  // The same frozen clock drives the zone, radar and temporary map notes.
+  expireMapMarks(s, s.pausedAt ?? now);
+  if (s.pausedAt != null) return events;
   if (s.phase === "hiding" && s.seekStartAt !== null && now >= s.seekStartAt) {
     s.phase = "seeking";
     events.push(ev("warn", "ev.seekerOut"));
@@ -531,6 +598,13 @@ export function viewFor(s: GameState, viewerId: string, now: number): GameView {
     me: { id: me.id, role: me.role, status: me.status, catchCode: me.role === "hider" ? me.catchCode : null, floor: me.floor ?? null },
     players,
     pings,
+    // Mark visibility is team-only, including for spectators; ended games expose none.
+    mapMarks: s.config.mapMarkLimit > 0 && inGame(s)
+      ? (s.mapMarks ?? []).filter((mark) =>
+        mark.role === me.role
+        && mark.expiresAt > (s.pausedAt ?? now)
+        && s.players[mark.playerId]?.role === mark.role)
+      : [],
     nextPingAt: s.nextPingAt,
     pausedAt: s.pausedAt ?? null,
     serverNow: now,

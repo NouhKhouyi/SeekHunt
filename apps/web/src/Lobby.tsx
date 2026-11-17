@@ -351,6 +351,21 @@ export function Lobby({ view, send, gps, onLeave }: Props) {
                 </label>
                 <Switch id="opt-building" disabled={!isHost} checked={!!cfg.buildingMode} onChange={(v) => setConfig({ buildingMode: v })} />
               </li>
+              <li>
+                <label htmlFor="opt-marks">
+                  {t("rule.mapMarkings")}
+                  <span className="hint">{t("rule.mapMarkingsHint")}</span>
+                </label>
+                <select
+                  id="opt-marks"
+                  disabled={!isHost}
+                  value={cfg.mapMarkLimit ?? 0}
+                  onChange={(e) => setConfig({ mapMarkLimit: Number(e.target.value) })}
+                >
+                  <option value={0}>{t("rule.mapMarkingsOff")}</option>
+                  {[1, 2, 3].map((n) => <option key={n} value={n}>{n}</option>)}
+                </select>
+              </li>
               {ADVANCED.map((o) => (
                 <li key={o.key}>
                   <label htmlFor={`opt-${o.key}`}>

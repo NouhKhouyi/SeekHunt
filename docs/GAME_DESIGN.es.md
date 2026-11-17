@@ -55,9 +55,15 @@ El anfitrión puede pausar en cualquier momento del escondite o la búsqueda. Se
 - Si los dos móviles miden la altitud con un error de ±10 m o menos, el radar añade la diferencia ("9 m más arriba") como comprobación.
 - Si en algún momento se empaqueta como app nativa (Capacitor), el barómetro permitiría detectar las plantas solo.
 
+**Marcas del mapa (`mapMarkLimit`).** Desactivadas por defecto; el anfitrión permite de 1 a 3 por jugador.
+- Durante el escondite y la búsqueda, un jugador activo toca el mapa para dejar una nota: "rival avistado" o "nadie encontrado".
+- Solo la recibe su propio equipo, espectadores incluidos. Muestra quién la puso y desaparece a los 2 minutos; editarla o moverla reinicia la cuenta atrás, y la pausa la congela.
+- Solo su autor puede cambiarla o borrarla. En modo infección, las notas de quien es pillado se borran, así que nada pasa al equipo cazador.
+- Las notas se borran al acabar la partida.
+
 ## Idiomas
 
-La interfaz está en español e inglés, y se elige automáticamente según el idioma del móvil (se puede cambiar con el selector ES/EN). El servidor nunca envía frases: envía claves con parámetros (`ev.caughtBy {by, name}`), y cada móvil las muestra en su idioma. Así, en una misma partida cada jugador ve los avisos en el suyo. Los textos están en `apps/web/src/i18n.ts`.
+La interfaz está en español, inglés y alemán, y se elige automáticamente según el idioma del móvil (se puede cambiar con el selector ES/EN/DE). El servidor nunca envía frases: envía claves con parámetros (`ev.caughtBy {by, name}`), y cada móvil las muestra en su idioma. Así, en una misma partida cada jugador ve los avisos en el suyo. Los textos están en `apps/web/src/i18n.ts`.
 
 ## Mecánicas para equilibrar
 
@@ -72,6 +78,31 @@ La interfaz está en español e inglés, y se elige automáticamente según el i
 | **Vuelta a la zona** | Quien sale ve una flecha y la distancia hasta el borde. |
 | **Equilibrio de equipos** | En grupos de 6 o más, la sala sugiere 1 cazador por cada 4–6 escondidos. |
 | **Saltos imposibles** | Se descartan las posiciones que implican más de 60 m/s. Es un antitrampas ligero contra GPS falso. |
+
+## Marcas del mapa (`mapMarkLimit`)
+
+Regla opcional, desactivada por defecto. Elige entre 0 y 3 marcas por jugador;
+0 las desactiva. Activa el botón de bandera encima de
+SOS y toca el mapa para señalar un rival
+avistado (ojo verde) o un lugar revisado (X naranja). Cada jugador activo puede tener hasta el límite elegido.
+Desaparecen tras dos minutos de juego; las pausas detienen la cuenta atrás y
+editar o mover una marca la reinicia a dos minutos. Al tocarla se muestra su autor, el
+único que puede modificarla o borrarla. Para moverla, mantén pulsado durante
+450 ms y arrastra con ratón o dedo, o elige "Mover marca" y toca el destino.
+El botón empieza desactivado y muestra un borde naranja cuando está activo.
+El botón controla tanto la visibilidad como la edición: al desactivarlo se ocultan
+las marcas propias y del equipo solo para ese jugador, sin borrarlas. Un contador
+muestra todas las marcas disponibles y desaparece cuando no queda ninguna. Si
+un compañero añade una marca o cambia su icono o posición mientras están ocultas,
+el botón parpadea suavemente hasta mostrarlas o hasta que esas marcas se eliminen
+o caduquen. Los espectadores pueden mostrar las marcas de su equipo, pero no
+editarlas. Escape también desactiva el botón. En simulación,
+los toques mueven al jugador mientras esté desactivado.
+Las pausas o dejar de jugar activamente también lo desactivan.
+
+El servidor solo envía marcas al equipo correspondiente, también en modo
+espectador. Al cambiar de equipo por infección se borran las marcas propias
+anteriores. Se conservan al reconectar y se borran al terminar la ronda.
 
 ## Seguridad y privacidad (requisitos, no extras)
 

@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_CONFIG, effectiveFinalRadius, sanitizeConfig } from "./config";
+import { DEFAULT_CONFIG, effectiveFinalRadius, MAX_MAP_MARKS, sanitizeConfig } from "./config";
 import { distance, offset } from "./geo";
-import { createGame, handle, hello, tick, viewFor } from "./engine";
+import { createGame, handle, hello, MAP_MARK_TTL_MS, tick, viewFor } from "./engine";
+import type { ClientMsg } from "./protocol";
 import { mulberry32 } from "./rng";
 import { buildSchedule, zoneAt } from "./zones";
 
@@ -9,6 +10,182 @@ const center = DEFAULT_CONFIG.zone.center;
 const join = (s: ReturnType<typeof createGame>, id: string, name: string) =>
   hello(s, { t: "hello", playerId: id.padEnd(8, "x"), secret: "secret-" + id, name });
 const id = (x: string) => x.padEnd(8, "x");
+
+describe("map markings", () => {
+  function game(overrides = {}) {
+    const s = createGame("MARKS");
+    for (const name of ["seek", "seek2", "ana", "bea"]) join(s, name, name);
+    handle(s, id("seek"), { t: "config", config: { hideSeconds: 60, pingIntervalSeconds: 0, lastSurvivorWins: false, mapMarkLimit: 3, ...overrides } }, 1000);
+    handle(s, id("seek"), { t: "setRole", playerId: id("seek2"), role: "seeker" }, 1000);
+    handle(s, id("seek"), { t: "start" }, 1000, mulberry32(1));
+    return s;
+  }
+  const add = (s: ReturnType<typeof game>, who = "ana", at = 2000) => {
+    expect(handle(s, id(who), { t: "markAdd", ...center, kind: "suspect" }, at)).toEqual([]);
+    return s.mapMarks!.at(-1)!;
+  };
+
+  it("is opt-in and loads old rooms without the new fields", () => {
+    expect(DEFAULT_CONFIG.mapMarkLimit).toBe(0);
+    const s = game({ mapMarkLimit: 0 });
+    expect(() => add(s)).toThrow("err.notAllowed");
+    delete (s.config as Partial<typeof s.config>).mapMarkLimit;
+    delete s.mapMarks;
+    expect(sanitizeConfig({}, s.config).mapMarkLimit).toBe(0);
+    expect(viewFor(s, id("ana"), 2000).mapMarks).toEqual([]);
+    handle(s, id("seek"), { t: "end" }, 2000);
+    handle(s, id("seek"), { t: "reset" }, 3000);
+    handle(s, id("seek"), { t: "config", config: { mapMarkLimit: 3 } }, 4000);
+    handle(s, id("seek"), { t: "start" }, 5000, mulberry32(1));
+    delete s.mapMarks;
+    expect(add(s, "ana", 6000).role).toBe("hider");
+  });
+
+  it("sends each team only its own notes, including for the host and spectators", () => {
+    const s = game();
+    const hider = add(s);
+    const seeker = add(s, "seek");
+    for (const name of ["ana", "bea"]) expect(viewFor(s, id(name), 3000).mapMarks).toEqual([hider]);
+    for (const name of ["seek", "seek2"]) expect(viewFor(s, id(name), 3000).mapMarks).toEqual([seeker]);
+    s.players[id("ana")]!.status = "caught";
+    s.players[id("seek2")]!.status = "eliminated";
+    expect(viewFor(s, id("ana"), 3000).mapMarks).toEqual([hider]);
+    expect(viewFor(s, id("seek2"), 3000).mapMarks).toEqual([seeker]);
+    s.phase = "ended";
+    expect(viewFor(s, id("ana"), 3000).mapMarks).toEqual([]);
+    expect(viewFor(s, id("seek"), 3000).mapMarks).toEqual([]);
+  });
+
+  it("limits each player independently and immediately frees removed or expired slots", () => {
+    const s = game();
+    for (let n = 0; n < MAX_MAP_MARKS; n++) add(s);
+    expect(() => add(s)).toThrow("err.markLimit");
+    add(s, "bea");
+    handle(s, id("ana"), { t: "markRemove", id: s.mapMarks![0]!.id }, 3000);
+    add(s, "ana", 3000);
+    expect(viewFor(s, id("ana"), 3000).mapMarks).toHaveLength(4);
+    // No tick is needed for expired notes to stop occupying a slot.
+    add(s, "ana", 2000 + MAP_MARK_TTL_MS);
+    expect(s.mapMarks!.filter((m) => m.playerId === id("ana"))).toHaveLength(2);
+  });
+
+  it("expires after exactly two minutes and survives a reconnect without resetting the clock", () => {
+    const s = game();
+    const mark = add(s);
+    expect(mark.expiresAt).toBe(2000 + MAP_MARK_TTL_MS);
+    join(s, "ana", "ana");
+    expect(viewFor(s, id("ana"), mark.expiresAt - 1).mapMarks).toHaveLength(1);
+    expect(viewFor(s, id("ana"), mark.expiresAt).mapMarks).toEqual([]);
+    tick(s, mark.expiresAt);
+    expect(s.mapMarks).toEqual([]);
+    expect(() => handle(s, id("ana"), { t: "markUpdate", id: mark.id, kind: "clear" }, mark.expiresAt)).toThrow("err.markUnavailable");
+  });
+
+  it("allows only the owner to edit, move or remove a note and renews it on saved edits", () => {
+    const s = game();
+    const mark = add(s);
+    for (const who of ["bea", "seek"]) {
+      expect(() => handle(s, id(who), { t: "markUpdate", id: mark.id, kind: "clear" }, 3000)).toThrow("err.markUnavailable");
+      expect(() => handle(s, id(who), { t: "markUpdate", id: mark.id, lat: 10, lng: 20 }, 3000)).toThrow("err.markUnavailable");
+      expect(() => handle(s, id(who), { t: "markRemove", id: mark.id }, 3000)).toThrow("err.markUnavailable");
+    }
+    expect(mark.expiresAt).toBe(2000 + MAP_MARK_TTL_MS);
+    handle(s, id("ana"), { t: "markUpdate", id: mark.id, kind: "clear" }, 4000);
+    expect(mark.expiresAt).toBe(4000 + MAP_MARK_TTL_MS);
+    handle(s, id("ana"), { t: "markUpdate", id: mark.id, lat: 10, lng: 20 }, 5000);
+    expect(mark).toMatchObject({ kind: "clear", pos: { lat: 10, lng: 20 }, expiresAt: 5000 + MAP_MARK_TTL_MS });
+    handle(s, id("ana"), { t: "markUpdate", id: mark.id, kind: "clear" }, 6000);
+    expect(mark.expiresAt).toBe(6000 + MAP_MARK_TTL_MS);
+    handle(s, id("ana"), { t: "markRemove", id: mark.id }, 7000);
+    expect(s.mapMarks).toEqual([]);
+  });
+
+  it("keeps an edited mark visible past its original expiry for a full new countdown", () => {
+    const s = game();
+    const mark = add(s);
+    const originalExpiry = mark.expiresAt;
+    const editedAt = originalExpiry - 1000;
+    handle(s, id("ana"), { t: "markUpdate", id: mark.id, kind: "clear" }, editedAt);
+    expect(mark.expiresAt).toBe(editedAt + MAP_MARK_TTL_MS);
+    expect(viewFor(s, id("bea"), originalExpiry).mapMarks).toEqual([mark]);
+    expect(viewFor(s, id("bea"), mark.expiresAt - 1).mapMarks).toHaveLength(1);
+    expect(viewFor(s, id("bea"), mark.expiresAt).mapMarks).toEqual([]);
+    expect(() => handle(s, id("ana"), { t: "markUpdate", id: mark.id, kind: "suspect" }, mark.expiresAt)).toThrow("err.markUnavailable");
+  });
+
+  it("rejects malformed coordinates, icons and incomplete edits without partial mutation", () => {
+    const s = game();
+    for (const values of [{ lat: NaN }, { lng: Infinity }, { lat: 86 }, { lng: 181 }, { kind: "other" }, { lat: "10" }]) {
+      const msg = { t: "markAdd", ...center, kind: "suspect", ...values } as unknown as ClientMsg;
+      expect(() => handle(s, id("ana"), msg, 2000)).toThrow("err.invalidMark");
+    }
+    const mark = add(s);
+    const before = { ...mark, pos: { ...mark.pos } };
+    for (const values of [{}, { lat: 10 }, { kind: "clear", lat: 10 }, { kind: "other" }, { lat: null, lng: 10 }]) {
+      const msg = { t: "markUpdate", id: mark.id, ...values } as unknown as ClientMsg;
+      expect(() => handle(s, id("ana"), msg, 3000)).toThrow("err.invalidMark");
+      expect(mark).toEqual(before);
+    }
+  });
+
+  it("freezes countdowns during pauses and resumes with exactly the remaining duration", () => {
+    const s = game();
+    const mark = add(s);
+    handle(s, id("ana"), { t: "markUpdate", id: mark.id, kind: "clear" }, 12_000);
+    handle(s, id("seek"), { t: "pause" }, 32_000);
+    tick(s, 500_000);
+    expect(viewFor(s, id("bea"), 500_000).mapMarks).toEqual([mark]);
+    for (const msg of [
+      { t: "markAdd", ...center, kind: "suspect" },
+      { t: "markUpdate", id: mark.id, kind: "clear" },
+      { t: "markRemove", id: mark.id },
+    ] as ClientMsg[]) expect(() => handle(s, id("ana"), msg, 500_000)).toThrow("err.paused");
+    handle(s, id("seek"), { t: "resume" }, 532_000);
+    expect(mark.expiresAt).toBe(632_000);
+    expect(viewFor(s, id("ana"), 631_999).mapMarks).toHaveLength(1);
+    expect(viewFor(s, id("ana"), 632_000).mapMarks).toEqual([]);
+    // A second pause shifts the same mark once again, without reviving expired ones.
+    handle(s, id("seek"), { t: "pause" }, 600_000);
+    handle(s, id("seek"), { t: "resume" }, 700_000);
+    expect(mark.expiresAt).toBe(732_000);
+    tick(s, 732_000);
+    expect(s.mapMarks).toEqual([]);
+  });
+
+  it("removes a converted player's notes and never transfers the old team's notes", () => {
+    const s = game({ caughtBecomeSeekers: true });
+    const mine = add(s);
+    const oldTeam = add(s, "bea");
+    const newTeam = add(s, "seek");
+    tick(s, 61_000);
+    handle(s, id("seek"), { t: "catch", code: s.players[id("ana")]!.catchCode! }, 62_000);
+    expect(s.mapMarks).not.toContain(mine);
+    expect(viewFor(s, id("ana"), 62_000).mapMarks).toEqual([newTeam]);
+    expect(viewFor(s, id("bea"), 62_000).mapMarks).toEqual([oldTeam]);
+    expect(add(s, "ana", 63_000).role).toBe("seeker");
+    expect(() => handle(s, id("ana"), { t: "markRemove", id: oldTeam.id }, 64_000)).toThrow("err.markUnavailable");
+  });
+
+  it("disables mutations for caught and eliminated players and outside a running round", () => {
+    const s = game();
+    const mark = add(s);
+    for (const status of ["caught", "eliminated"] as const) {
+      s.players[id("ana")]!.status = status;
+      expect(() => add(s)).toThrow("err.notAllowed");
+      expect(() => handle(s, id("ana"), { t: "markRemove", id: mark.id }, 3000)).toThrow("err.notAllowed");
+    }
+    s.players[id("ana")]!.status = "active";
+    handle(s, id("seek"), { t: "end" }, 4000);
+    expect(s.mapMarks).toEqual([]);
+    expect(() => add(s)).toThrow("err.wrongPhase");
+    handle(s, id("seek"), { t: "reset" }, 5000);
+    expect(s.mapMarks).toEqual([]);
+    expect(() => add(s)).toThrow("err.wrongPhase");
+    handle(s, id("seek"), { t: "start" }, 6000, mulberry32(1));
+    const next = add(s, "ana", 7000);
+    expect(next.id).not.toBe(mark.id);
+  });
+});
 
 function startedGame(players = ["seek", "ana", "bea"], overrides = {}) {
   const s = createGame("ABCD");
@@ -20,6 +197,16 @@ function startedGame(players = ["seek", "ana", "bea"], overrides = {}) {
 }
 
 describe("config", () => {
+  it("clamps the map marking limit and keeps it off for rooms saved without it", () => {
+    expect(sanitizeConfig({ mapMarkLimit: 2.4 }, DEFAULT_CONFIG).mapMarkLimit).toBe(2);
+    expect(sanitizeConfig({ mapMarkLimit: 99 }, DEFAULT_CONFIG).mapMarkLimit).toBe(MAX_MAP_MARKS);
+    expect(sanitizeConfig({ mapMarkLimit: -1 }, DEFAULT_CONFIG).mapMarkLimit).toBe(0);
+    expect(sanitizeConfig({ mapMarkLimit: NaN }, { ...DEFAULT_CONFIG, mapMarkLimit: 2 }).mapMarkLimit).toBe(2);
+    const legacy = { ...DEFAULT_CONFIG } as Partial<typeof DEFAULT_CONFIG>;
+    delete legacy.mapMarkLimit;
+    expect(sanitizeConfig({}, legacy as typeof DEFAULT_CONFIG).mapMarkLimit).toBe(0);
+  });
+
   it("accepts exact radii down to 25 m and keeps the chosen final radius", () => {
     const small = sanitizeConfig({ zone: { center, radius: 30.4 } }, DEFAULT_CONFIG);
     expect(small.zone.radius).toBe(30);

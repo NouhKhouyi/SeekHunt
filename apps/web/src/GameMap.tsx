@@ -6,6 +6,7 @@ import "maplibre-gl/dist/maplibre-gl.css";
 import workerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?url";
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { initials } from "./ui";
+import { type MapMarkView, type MapMarkPopup, MapMarkers } from "./MapMarkers";
 
 export interface MapPlayer {
   id: string;
@@ -40,6 +41,11 @@ interface Props {
   /** The game is paused: the map goes grey. */
   paused?: boolean;
   onTap?: (p: LatLng) => void;
+  mapMarks?: MapMarkView[];
+  markNow?: number;
+  markPopup?: MapMarkPopup;
+  onMarkTap?: (id: string) => void;
+  onMarkMove?: (id: string, p: LatLng) => void;
 }
 
 export interface MapHandle {
@@ -127,7 +133,24 @@ function markerEl(p: MapPlayer): HTMLElement {
   return el;
 }
 
-export const GameMap = forwardRef<MapHandle, Props>(function GameMap({ zone, nextZone, pings = [], players = [], focus, padding, refitKey, attribution = "bottom-right", shrinking = false, paused = false, onTap }, ref) {
+export const GameMap = forwardRef<MapHandle, Props>(function GameMap({
+  zone,
+  nextZone,
+  pings = [],
+  players = [],
+  focus,
+  padding,
+  refitKey,
+  attribution = "bottom-right",
+  shrinking = false,
+  paused = false,
+  onTap,
+  mapMarks = [],
+  markNow = 0,
+  markPopup,
+  onMarkTap,
+  onMarkMove,
+}, ref) {
   const el = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
   const markers = useRef(new Map<string, { marker: maplibregl.Marker; kind: string }>());
@@ -201,7 +224,10 @@ export const GameMap = forwardRef<MapHandle, Props>(function GameMap({ zone, nex
     map.addControl(new maplibregl.AttributionControl({ compact: true }), attribution);
     mapRef.current = map;
     setMapReady(true);
-    map.on("click", (e: MapMouseEvent) => onTapRef.current?.({ lat: e.lngLat.lat, lng: e.lngLat.lng }));
+    map.on("click", (e: MapMouseEvent) => {
+      if (e.originalEvent.target instanceof Element && e.originalEvent.target.closest(".map-mark, .maplibregl-popup")) return;
+      onTapRef.current?.({ lat: e.lngLat.lat, lng: e.lngLat.wrap().lng });
+    });
     map.on("load", () => {
       for (const id of ["mask", "zone", "next", "pings", "ping-points"]) map.addSource(id, { type: "geojson", data: empty });
       map.addLayer({ id: "mask", type: "fill", source: "mask", paint: { "fill-color": C.mask, "fill-opacity": C.maskOpacity } });
@@ -312,5 +338,15 @@ export const GameMap = forwardRef<MapHandle, Props>(function GameMap({ zone, nex
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focusKey]);
 
-  return <div ref={el} className={`map${paused ? " paused" : ""}`} />;
+  return <>
+    <div ref={el} className={`map${paused ? " paused" : ""}`} />
+    <MapMarkers
+      map={mapReady ? mapRef.current : null}
+      marks={mapMarks}
+      now={markNow}
+      popup={markPopup}
+      onTap={onMarkTap}
+      onMove={onMarkMove}
+    />
+  </>;
 });

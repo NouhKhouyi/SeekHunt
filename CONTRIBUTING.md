@@ -33,7 +33,7 @@ npm run build
 - **Rules live in `packages/shared`.** The engine is pure and
   server-authoritative; every rule change needs a test in `engine.test.ts`.
 - **No player-facing sentences from the server.** It sends message keys with
-  parameters; add the text to both languages in `apps/web/src/i18n.ts`.
+  parameters; add the text to all supported languages in `apps/web/src/i18n.ts`.
 - **Privacy is a requirement.** The server must never send a phone a position
   it isn't allowed to see. If you touch `viewFor`, say why in the PR.
 - **Try it.** Play your change in `?sim` mode, and on a phone if it touches GPS,

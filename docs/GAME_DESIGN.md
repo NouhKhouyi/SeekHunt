@@ -82,10 +82,45 @@ untied shoe, or anything that matters more than the game.
 - If the game is ever wrapped as a native app (Capacitor), the barometer could
   detect floors automatically.
 
+**Map markings (`mapMarkLimit`).** Off by default; the host allows 1–3 per player.
+- During hiding and seeking, an active player taps the map to drop a note:
+  "opponent sighted" or "nobody found".
+- Only the player's own team ever receives the note, spectators included. It
+  shows who placed it and disappears after 2 minutes; editing or moving it
+  restarts the countdown, and a pause freezes it.
+- Only the author can change or remove a note. In infection mode a caught
+  player's notes are deleted, so nothing crosses over to the seekers.
+- Notes are cleared when the game ends.
+
+## Map markings (`mapMarkLimit`)
+
+An optional lobby rule, disabled by default. Choose 0–3 marks per player; 0
+disables them.
+
+Enable the flag button above SOS, then tap the map to choose "Opponent sighted" (green eye)
+or "Nobody found" (orange X). Each active player can place up to the selected limit.
+Every note shows its remaining time and disappears after two minutes of game
+time; host pauses freeze the countdown. Each saved edit or move resets the
+countdown to two minutes. Tapping a note shows its author; only its owner can change or remove
+it. Hold for 450 ms and drag with mouse or touch to move it, or use "Move mark"
+and tap the destination. The flag button starts off and uses an orange outline
+while active. It controls both visibility and editing: switching it off hides all
+own and team notes locally without deleting them. A badge counts all available
+team notes, including your own, and disappears when none remain. New notes and
+changes to a note's icon or position by teammates make the hidden-mode button
+gently flash until you show them or those notes are removed or expire. Spectators
+can show their team's notes but cannot edit them. Escape also
+switches the button off. In simulation mode, taps move the player while the flag
+button is off. Pausing or leaving active play switches it off as well.
+
+The server sends notes only to their own team, including when a player is
+spectating. An infected player's old notes are removed when they change
+teams. Notes survive reconnects, and are cleared when the round ends.
+
 ## Languages
 
-The interface is in English and Spanish, picked automatically from the phone's
-language and switchable with the EN/ES toggle. The server never sends
+The interface is in English, Spanish and German, picked automatically from the phone's
+language and switchable with the EN/ES/DE selector. The server never sends
 sentences: it sends message keys with parameters (`ev.caughtBy {by, name}`),
 and each phone shows them in its own language, so players in the same game can
 each read the alerts in theirs. The strings live in `apps/web/src/i18n.ts`.
